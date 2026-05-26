@@ -8,7 +8,20 @@ class AuditLogRepository:
 
     def get_by_id(self, db: Session, log_id: str):
         return db.query(AuditLog).filter(AuditLog.id == log_id).first()
+   def update(self, db: Session, log_id: str, update_data: dict):
+    log = self.get_by_id(db, log_id)
 
+    if not log:
+        return None
+
+    for key, value in update_data.items():
+        setattr(log, key, value)
+
+    db.commit()
+    db.refresh(log)
+
+    return log
+    
     def create(self, db: Session, log_data: dict):
         log = AuditLog(**log_data)
         db.add(log)
