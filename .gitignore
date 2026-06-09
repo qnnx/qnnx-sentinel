@@ -4,6 +4,9 @@ liboqs/
 venv/
 __pycache__/
 *.pyc
+<<<<<<< HEAD
 test_connection.py
 zota.py
 .env
+=======
+>>>>>>> saksham-backend
