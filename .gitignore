@@ -1,5 +1,6 @@
 .oqs/
 .oqs-build/
+.oqs-runtime/
 liboqs/
 venv/
 __pycache__/
