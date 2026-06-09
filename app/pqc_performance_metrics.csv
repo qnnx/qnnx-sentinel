@@ -1,0 +1,19 @@
+Algorithm,Type,Operation,Time_ms
+ML-KEM-512,KEM,Key Generation,0.4127
+ML-KEM-512,KEM,Encapsulation,0.2949
+ML-KEM-512,KEM,Decapsulation,0.3823
+ML-KEM-768,KEM,Key Generation,0.334
+ML-KEM-768,KEM,Encapsulation,0.3829
+ML-KEM-768,KEM,Decapsulation,0.4308
+ML-KEM-1024,KEM,Key Generation,0.4612
+ML-KEM-1024,KEM,Encapsulation,0.4762
+ML-KEM-1024,KEM,Decapsulation,0.491
+ML-DSA-44,DSA,Key Generation,0.4425
+ML-DSA-44,DSA,Sign,1.5725
+ML-DSA-44,DSA,Verify,0.5588
+ML-DSA-65,DSA,Key Generation,0.6751
+ML-DSA-65,DSA,Sign,2.2424
+ML-DSA-65,DSA,Verify,0.6948
+ML-DSA-87,DSA,Key Generation,0.9834
+ML-DSA-87,DSA,Sign,2.6021
+ML-DSA-87,DSA,Verify,1.0549
