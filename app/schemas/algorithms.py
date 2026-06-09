@@ -1,0 +1,14 @@
+from pydantic import BaseModel
+from typing import List, Optional
+
+class AlgorithmInfo(BaseModel):
+    id: str
+    name: str
+    type: str
+    security_level: int
+    standard: str
+    description: Optional[str] = None
+
+class AlgorithmsResponse(BaseModel):
+    total: int
+    algorithms: List[AlgorithmInfo]
