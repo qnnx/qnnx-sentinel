@@ -8,6 +8,8 @@ class AlgorithmInfo(BaseModel):
     security_level: int
     standard: str
     description: Optional[str] = None
+    status: Optional[str] = None
+    recommended_use: Optional[str] = None
 
 class AlgorithmsResponse(BaseModel):
     total: int
