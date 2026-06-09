@@ -1,11 +1,6 @@
 from fastapi import APIRouter
-<<<<<<< HEAD
-from app.schemas.algorithms import AlgorithmsResponse
-from app.services.algorithm_service import get_all_algorithms
-=======
 from app.schemas.algorithms import AlgorithmsResponse, AlgorithmInfo
 from app.services.algorithm_service import get_all_algorithms, get_algorithm_by_name
->>>>>>> saksham-backend
 
 router = APIRouter()
 
@@ -17,8 +12,6 @@ router = APIRouter()
 )
 def list_algorithms():
     return get_all_algorithms()
-<<<<<<< HEAD
-=======
 
 @router.get(
     "/algorithms/{name}",
@@ -28,4 +21,3 @@ def list_algorithms():
 )
 def get_algorithm(name: str):
     return get_algorithm_by_name(name)
->>>>>>> saksham-backend

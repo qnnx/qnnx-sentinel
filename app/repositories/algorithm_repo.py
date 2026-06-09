@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.models.algorithm import Algorithm
 
@@ -13,7 +14,7 @@ class AlgorithmRepository:
         return db.query(Algorithm).filter(Algorithm.algo_id == algo_id).first()
 
     def get_by_name(self, db: Session, name: str):
-        return db.query(Algorithm).filter(Algorithm.name == name).first()
+        return db.query(Algorithm).filter(func.lower(Algorithm.name) == name.lower()).first()
 
     def create(self, db: Session, algorithm_data: dict):
         algorithm = Algorithm(**algorithm_data)

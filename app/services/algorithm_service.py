@@ -1,78 +1,45 @@
-from typing import List, Optional
 from fastapi import HTTPException
+
+from app.core.database import SessionLocal
+from app.models.algorithm import Algorithm
+from app.repositories.algorithm_repo import AlgorithmRepository
 from app.schemas.algorithms import AlgorithmInfo, AlgorithmsResponse
 
-ALGORITHMS: List[AlgorithmInfo] = [
-    AlgorithmInfo(
-        id="ml-kem-512",
-        name="ML-KEM-512",
-        type="KEM",
-        security_level=1,
-        standard="FIPS 203",
-        description="Module Lattice Key Encapsulation Mechanism - 128-bit security",
-        status="active",
-        recommended_use="Key exchange in low-security environments"
-    ),
-    AlgorithmInfo(
-        id="ml-kem-768",
-        name="ML-KEM-768",
-        type="KEM",
-        security_level=3,
-        standard="FIPS 203",
-        description="Module Lattice Key Encapsulation Mechanism - 192-bit security",
-        status="active",
-        recommended_use="General purpose key exchange"
-    ),
-    AlgorithmInfo(
-        id="ml-kem-1024",
-        name="ML-KEM-1024",
-        type="KEM",
-        security_level=5,
-        standard="FIPS 203",
-        description="Module Lattice Key Encapsulation Mechanism - 256-bit security",
-        status="active",
-        recommended_use="High security key exchange"
-    ),
-    AlgorithmInfo(
-        id="ml-dsa-44",
-        name="ML-DSA-44",
-        type="DSA",
-        security_level=2,
-        standard="FIPS 204",
-        description="Module Lattice Digital Signature Algorithm - 128-bit security",
-        status="active",
-        recommended_use="Digital signatures in low-security environments"
-    ),
-    AlgorithmInfo(
-        id="ml-dsa-65",
-        name="ML-DSA-65",
-        type="DSA",
-        security_level=3,
-        standard="FIPS 204",
-        description="Module Lattice Digital Signature Algorithm - 192-bit security",
-        status="active",
-        recommended_use="General purpose digital signatures"
-    ),
-    AlgorithmInfo(
-        id="ml-dsa-87",
-        name="ML-DSA-87",
-        type="DSA",
-        security_level=5,
-        standard="FIPS 204",
-        description="Module Lattice Digital Signature Algorithm - 256-bit security",
-        status="active",
-        recommended_use="High security digital signatures"
-    ),
-]
+algorithm_repository = AlgorithmRepository()
 
-def get_all_algorithms() -> AlgorithmsResponse:
-    return AlgorithmsResponse(
-        total=len(ALGORITHMS),
-        algorithms=ALGORITHMS
+
+def _to_algorithm_info(algorithm: Algorithm) -> AlgorithmInfo:
+    return AlgorithmInfo(
+        algo_id=algorithm.algo_id,
+        name=algorithm.name,
+        type=algorithm.type,
+        security_level=algorithm.security_level,
+        standard=algorithm.nist_standard,
+        description=algorithm.description,
+        status=algorithm.status,
+        recommended_use=algorithm.recommended_use,
     )
 
+
+def get_all_algorithms() -> AlgorithmsResponse:
+    db = SessionLocal()
+    try:
+        algorithms = algorithm_repository.get_all(db)
+        algorithm_items = [_to_algorithm_info(algorithm) for algorithm in algorithms]
+        return AlgorithmsResponse(
+            total=len(algorithm_items),
+            algorithms=algorithm_items,
+        )
+    finally:
+        db.close()
+
+
 def get_algorithm_by_name(name: str) -> AlgorithmInfo:
-    for algorithm in ALGORITHMS:
-        if algorithm.name.upper() == name.upper():
-            return algorithm
-    raise HTTPException(status_code=404, detail="Algorithm not found")
+    db = SessionLocal()
+    try:
+        algorithm = algorithm_repository.get_by_name(db, name)
+        if not algorithm:
+            raise HTTPException(status_code=404, detail="Algorithm not found")
+        return _to_algorithm_info(algorithm)
+    finally:
+        db.close()
