@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 class AlgorithmInfo(BaseModel):
-    id: str
+    algo_id: str
     name: str
     type: str
     security_level: int

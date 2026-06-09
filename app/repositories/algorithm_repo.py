@@ -9,6 +9,9 @@ class AlgorithmRepository:
     def get_by_id(self, db: Session, algorithm_id: str):
         return db.query(Algorithm).filter(Algorithm.id == algorithm_id).first()
 
+    def get_by_algo_id(self, db: Session, algo_id: str):
+        return db.query(Algorithm).filter(Algorithm.algo_id == algo_id).first()
+
     def get_by_name(self, db: Session, name: str):
         return db.query(Algorithm).filter(Algorithm.name == name).first()
 

@@ -10,6 +10,7 @@ class Algorithm(Base):
     __table_args__ = {"schema": "crypto"}
 
     id = Column(UUID(as_uuid=True), primary_key=True)
+    algo_id = Column(Text, unique=True, nullable=False)
 
     name = Column(Text, unique=True, nullable=False)
     type = Column(Text, nullable=False)
