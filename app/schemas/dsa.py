@@ -6,22 +6,22 @@ class KeyGenRequest(BaseModel):
 
 class SignRequest(BaseModel):
     algorithm: str
-    message: str     # Plain text string
-    private_key: str # Hex-encoded string
+    message: str
+    private_key: str
 
 class VerifyRequest(BaseModel):
     algorithm: str
-    message: str     # Plain text string
-    signature: str   # Hex-encoded string
-    public_key: str  # Hex-encoded string
+    message: str
+    signature: str
+    public_key: str
 
 # RESPONSES
 class KeyGenResponse(BaseModel):
-    public_key: str  # Hex-encoded string
-    private_key: str # Hex-encoded string
+    public_key: str
+    private_key: str
 
 class SignResponse(BaseModel):
-    signature: str   # Hex-encoded string
+    signature: str
 
 class VerifyResponse(BaseModel):
     is_valid: bool
