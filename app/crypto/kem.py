@@ -1,6 +1,6 @@
 import ctypes
 
-from crypto._oqs_loader import load_key_encapsulation
+from app.crypto._oqs_loader import load_key_encapsulation
 
 class KEMManager:
     @staticmethod

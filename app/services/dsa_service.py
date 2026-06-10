@@ -1,5 +1,5 @@
-from crypto.dsa import DSAManager
-from schemas.dsa import (
+from app.crypto.dsa import DSAManager
+from app.schemas.dsa import (
     KeyGenRequest, KeyGenResponse,
     SignRequest, SignResponse,
     VerifyRequest, VerifyResponse

@@ -1,6 +1,8 @@
 import sys
 import os
 
+from app.services import dsa_service
+
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 app_dir = os.path.dirname(current_dir)
@@ -11,11 +13,11 @@ if app_dir not in sys.path:
 import uuid
 
 # Import our underlying services 
-from services import kem_services, dsa_services
+from app.services import kem_service
 
 # Import the schemas needed to communicate with those services
-from schemas.kem import KeyGenRequest as KEMRequest
-from schemas.dsa import KeyGenRequest as DSARequest
+from app.schemas.kem import KeyGenRequest as KEMRequest
+from app.schemas.dsa import KeyGenRequest as DSARequest
 
 # Define our recognized algorithms for routing
 SUPPORTED_KEMS = ["ML-KEM-512", "ML-KEM-768", "ML-KEM-1024", "Kyber512", "Kyber768", "Kyber1024"]
@@ -31,12 +33,12 @@ def generate_keypair(algorithm: str) -> dict:
     if algorithm in SUPPORTED_KEMS:
         key_type = "kem"
         request_schema = KEMRequest(algorithm=algorithm)
-        raw_response = kem_services.generate_kem_keypair(request_schema)
+        raw_response = kem_service.generate_kem_keypair(request_schema)
         
     elif algorithm in SUPPORTED_DSAS:
         key_type = "dsa"
         request_schema = DSARequest(algorithm=algorithm)
-        raw_response = dsa_services.generate_dsa_keypair(request_schema)
+        raw_response = dsa_service.generate_dsa_keypair(request_schema)
         
     else:
         return {

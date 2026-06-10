@@ -1,5 +1,5 @@
-from crypto.kem import KEMManager
-from schemas.kem import (
+from app.crypto.kem import KEMManager
+from app.schemas.kem import (
     KeyGenRequest, KeyGenResponse,
     EncapsulationRequest, EncapsulationResponse,
     DecapsulationRequest, DecapsulationResponse
