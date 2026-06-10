@@ -69,7 +69,11 @@ def get_user_api_keys(user_id: str) -> list[dict]:
     db = SessionLocal()
     try:
         api_keys = api_key_repository.get_by_user_id(db, user_id)
-        return [_serialize_api_key(api_key) for api_key in api_keys]
+        active_api_keys = [
+            api_key for api_key in api_keys
+            if (api_key.status or "").lower() != "revoked"
+        ]
+        return [_serialize_api_key(api_key) for api_key in active_api_keys]
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=500, detail="Failed to fetch API keys") from exc
     finally:
