@@ -65,12 +65,3 @@ def generate_keypair(algorithm: str) -> dict:
         "private_key_export": raw_response.private_key 
     }
 
-# --- TESTING AREA ---
-if __name__ == "__main__":
-    print("[*] Testing KEM Routing...")
-    kem_result = generate_keypair("ML-KE-768") 
-    print(kem_result)
-
-    print("\n[*] Testing DSA Routing...")
-    dsa_result = generate_keypair("ML-DSA-44") 
-    print(dsa_result)
