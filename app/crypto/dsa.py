@@ -1,6 +1,6 @@
 import ctypes
 
-from crypto._oqs_loader import load_signature
+from app.crypto._oqs_loader import load_signature
 
 class DSAManager:
     @staticmethod

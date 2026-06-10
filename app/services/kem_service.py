@@ -1,42 +1,38 @@
-from crypto.kem import KEMManager
-from schemas.kem import (
-    KeyGenRequest, KeyGenResponse,
-    EncapsulationRequest, EncapsulationResponse,
-    DecapsulationRequest, DecapsulationResponse
-)
+from app.crypto.kem import KEMManager
 
-def generate_kem_keypair(request: KeyGenRequest) -> KeyGenResponse:
-    # Get raw bytes from engine
-    keys = KEMManager.generate_keypair(request.algorithm)
-    
-    # Return as hex strings
-    return KeyGenResponse(
-        public_key=keys["public_key"].hex(),
-        private_key=keys["private_key"].hex()
-    )
 
-def encapsulate_secret(request: EncapsulationRequest) -> EncapsulationResponse:
-    # Convert incoming hex string to raw bytes
-    pub_key_bytes = bytes.fromhex(request.public_key)
-    
-    # Get raw bytes from engine
-    encap = KEMManager.encapsulate(request.algorithm, pub_key_bytes)
-    
-    # Return as hex strings
-    return EncapsulationResponse(
-        ciphertext=encap["ciphertext"].hex(),
-        shared_secret=encap["shared_secret"].hex()
-    )
+SUPPORTED_KEMS = {name.casefold(): name for name in KEMManager.get_supported_kems()}
 
-def decapsulate_secret(request: DecapsulationRequest) -> DecapsulationResponse:
-    # Convert incoming hex strings to raw bytes
-    cipher_bytes = bytes.fromhex(request.ciphertext)
-    priv_key_bytes = bytes.fromhex(request.private_key)
-    
-    # Get raw bytes from engine
-    decap = KEMManager.decapsulate(request.algorithm, cipher_bytes, priv_key_bytes)
-    
-    # Return as hex strings
-    return DecapsulationResponse(
-        shared_secret=decap["shared_secret"].hex()
-    )
+
+def _resolve_algorithm(algorithm: str) -> str:
+    normalized_algorithm = algorithm.strip().casefold()
+    return SUPPORTED_KEMS.get(normalized_algorithm, algorithm.strip())
+
+
+def generate_kem_keypair(algorithm: str) -> dict:
+    algorithm = _resolve_algorithm(algorithm)
+    keys = KEMManager.generate_keypair(algorithm)
+    return {
+        "algorithm": algorithm,
+        "public_key": keys["public_key"],
+        "private_key": keys["private_key"],
+    }
+
+
+def encapsulate_secret(algorithm: str, public_key: bytes) -> dict:
+    algorithm = _resolve_algorithm(algorithm)
+    encap = KEMManager.encapsulate(algorithm, public_key)
+    return {
+        "algorithm": algorithm,
+        "ciphertext": encap["ciphertext"],
+        "shared_secret": encap["shared_secret"],
+    }
+
+
+def decapsulate_secret(algorithm: str, ciphertext: bytes, private_key: bytes) -> dict:
+    algorithm = _resolve_algorithm(algorithm)
+    decap = KEMManager.decapsulate(algorithm, ciphertext, private_key)
+    return {
+        "algorithm": algorithm,
+        "shared_secret": decap["shared_secret"],
+    }

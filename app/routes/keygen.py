@@ -1,17 +1,10 @@
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.dependencies import validate_api_key
+from app.schemas.keygen import KeyGenRequest, KeyGenResponse
+from app.services.key_service import generate_keypair
 
 router = APIRouter()
-
-class KeyGenRequest(BaseModel):
-    algorithm: str
-
-class KeyGenResponse(BaseModel):
-    algorithm: str
-    public_key: str
-    private_key: str
 
 @router.post(
     "/keygen",
@@ -21,8 +14,9 @@ class KeyGenResponse(BaseModel):
     description="Generate a public and private key pair for a given PQC algorithm."
 )
 def generate_keys(request: KeyGenRequest):
-    return KeyGenResponse(
-        algorithm=request.algorithm,
-        public_key="mock_public_key_base64",
-        private_key="mock_private_key_base64"
-    )
+    try:
+        return KeyGenResponse(**generate_keypair(request.algorithm))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Key generation failed: {exc}") from exc
