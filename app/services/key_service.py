@@ -1,9 +1,7 @@
 import sys
 import os
 
-# --- PATHING FIX ---
-# This ensures Python can find the 'schemas' and 'services' folders 
-# even if you click the Play button from inside this file.
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 app_dir = os.path.dirname(current_dir)
 if app_dir not in sys.path:
@@ -12,7 +10,7 @@ if app_dir not in sys.path:
 
 import uuid
 
-# Import our underlying services EXACTLY as you named them
+# Import our underlying services 
 from services import kem_services, dsa_services
 
 # Import the schemas needed to communicate with those services
@@ -33,13 +31,11 @@ def generate_keypair(algorithm: str) -> dict:
     if algorithm in SUPPORTED_KEMS:
         key_type = "kem"
         request_schema = KEMRequest(algorithm=algorithm)
-        # Calling kem_services with the 's'
         raw_response = kem_services.generate_kem_keypair(request_schema)
         
     elif algorithm in SUPPORTED_DSAS:
         key_type = "dsa"
         request_schema = DSARequest(algorithm=algorithm)
-        # Calling dsa_services with the 's'
         raw_response = dsa_services.generate_dsa_keypair(request_schema)
         
     else:
@@ -48,11 +44,11 @@ def generate_keypair(algorithm: str) -> dict:
             "error": f"Unsupported algorithm: '{algorithm}'. Must be a valid KEM or DSA."
         }
 
-    # 2. Generate a Mock ID for database storage later
+    # 2. Generate a ID for database
     new_key_id = str(uuid.uuid4())
     final_public_key = raw_response.public_key
 
-    # 3. Construct the standardized response payload
+    # 3. Resoponse
     return {
         "success": True,
         "key": {
