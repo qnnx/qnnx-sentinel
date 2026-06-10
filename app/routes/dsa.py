@@ -1,4 +1,5 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from app.core.dependencies import validate_api_key
 from app.schemas.dsa import (
     SignRequest,
     SignResponse,
@@ -10,6 +11,7 @@ router = APIRouter()
 
 @router.post(
     "/sign",
+    dependencies=[Depends(validate_api_key)],
     response_model=SignResponse,
     summary="Sign Message",
     description="Sign a message using a private key."
@@ -21,6 +23,7 @@ def sign_message(request: SignRequest):
 
 @router.post(
     "/verify",
+    dependencies=[Depends(validate_api_key)],
     response_model=VerifyResponse,
     summary="Verify Signature",
     description="Verify a message signature using a public key."

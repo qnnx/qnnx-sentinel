@@ -1,5 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+
+from app.core.dependencies import validate_api_key
 
 router = APIRouter()
 
@@ -13,6 +15,7 @@ class KeyGenResponse(BaseModel):
 
 @router.post(
     "/keygen",
+    dependencies=[Depends(validate_api_key)],
     response_model=KeyGenResponse,
     summary="Generate Key Pair",
     description="Generate a public and private key pair for a given PQC algorithm."

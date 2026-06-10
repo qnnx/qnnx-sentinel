@@ -1,4 +1,5 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from app.core.dependencies import validate_api_key
 from app.schemas.kem import (
     EncapsulationRequest,
     EncapsulationResponse,
@@ -10,6 +11,7 @@ router = APIRouter()
 
 @router.post(
     "/kem/encapsulate",
+    dependencies=[Depends(validate_api_key)],
     response_model=EncapsulationResponse,
     summary="KEM Encapsulate",
     description="Encapsulate a shared secret using a public key."
@@ -22,6 +24,7 @@ def kem_encapsulate(request: EncapsulationRequest):
 
 @router.post(
     "/kem/decapsulate",
+    dependencies=[Depends(validate_api_key)],
     response_model=DecapsulationResponse,
     summary="KEM Decapsulate",
     description="Decapsulate a shared secret using a private key."

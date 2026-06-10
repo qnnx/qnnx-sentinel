@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from app.models.audit_log import AuditLog
 
+
 class AuditLogRepository:
 
     def get_all(self, db: Session):
@@ -8,6 +9,12 @@ class AuditLogRepository:
 
     def get_by_id(self, db: Session, log_id: str):
         return db.query(AuditLog).filter(AuditLog.id == log_id).first()
+
+    def get_by_actor_id(self, db: Session, actor_id: str):
+        return db.query(AuditLog).filter(AuditLog.actor_id == actor_id).all()
+
+    def get_by_action(self, db: Session, action: str):
+        return db.query(AuditLog).filter(AuditLog.action == action).all()
 
     def create(self, db: Session, log_data: dict):
         log = AuditLog(**log_data)

@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from app.models.api_usage import ApiUsage
 
+
 class ApiUsageRepository:
 
     def get_all(self, db: Session):
@@ -8,6 +9,18 @@ class ApiUsageRepository:
 
     def get_by_id(self, db: Session, usage_id: str):
         return db.query(ApiUsage).filter(ApiUsage.id == usage_id).first()
+
+    def get_by_actor_id(self, db: Session, actor_id: str):
+        return db.query(ApiUsage).filter(ApiUsage.actor_id == actor_id).all()
+
+    def get_recent_by_actor_id(self, db: Session, actor_id: str, limit: int = 10):
+        return (
+            db.query(ApiUsage)
+            .filter(ApiUsage.actor_id == actor_id)
+            .order_by(ApiUsage.created_at.desc())
+            .limit(limit)
+            .all()
+        )
 
     def create(self, db: Session, usage_data: dict):
         usage = ApiUsage(**usage_data)

@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
+
 from app.models.api_key import ApiKey
-import secrets
 
 
 class APIKeyRepository:
@@ -11,36 +11,34 @@ class APIKeyRepository:
     def get_by_id(self, db: Session, api_key_id: str):
         return db.query(ApiKey).filter(ApiKey.id == api_key_id).first()
 
-    def get_by_key(self, db: Session, api_key: str):
-        return db.query(ApiKey).filter(ApiKey.api_key == api_key).first()
+    def get_by_hash(self, db: Session, key_hash: str):
+        return db.query(ApiKey).filter(ApiKey.key_hash == key_hash).first()
 
-    def create(self, db: Session, name: str):
-        generated_key = f"qnnx_{secrets.token_urlsafe(32)}"
+    def get_by_user_id(self, db: Session, user_id: str):
+        return db.query(ApiKey).filter(ApiKey.user_id == user_id).all()
 
-        api_key = ApiKey(
-            name=name,
-            api_key=generated_key,
-            is_active=True
-        )
-
+    def create(self, db: Session, api_key_data: dict):
+        api_key = ApiKey(**api_key_data)
         db.add(api_key)
         db.commit()
         db.refresh(api_key)
-
         return api_key
 
-    def revoke(self, db: Session, api_key_id: str):
+    def update(self, db: Session, api_key_id: str, update_data: dict):
         api_key = self.get_by_id(db, api_key_id)
 
         if not api_key:
             return None
 
-        api_key.is_active = False
+        for key, value in update_data.items():
+            setattr(api_key, key, value)
 
         db.commit()
         db.refresh(api_key)
-
         return api_key
+
+    def revoke(self, db: Session, api_key_id: str):
+        return self.update(db, api_key_id, {"status": "revoked"})
 
     def delete(self, db: Session, api_key_id: str):
         api_key = self.get_by_id(db, api_key_id)

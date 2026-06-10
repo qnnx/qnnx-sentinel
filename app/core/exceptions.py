@@ -1,4 +1,4 @@
-from fastapi import Request
+from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 
@@ -16,6 +16,8 @@ async def bad_request_handler(request: Request, exc: Exception):
     return error_response(False, 400, "Bad Request")
 
 async def unauthorized_handler(request: Request, exc: Exception):
+    if isinstance(exc, HTTPException) and isinstance(exc.detail, str):
+        return error_response(False, 401, exc.detail)
     return error_response(False, 401, "Unauthorized")
 
 async def forbidden_handler(request: Request, exc: Exception):
