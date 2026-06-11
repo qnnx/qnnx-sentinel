@@ -32,6 +32,11 @@ class GetAPIKeysRequest(BaseModel):
 class CreateAPIKeyResponse(APIKeyResponse):
     api_key: str
 
+
+class RevokeAPIKeyRequest(BaseModel):
+    api_key_id: str
+    user_id: str
+
 @router.get(
     "/api-keys",
     response_model=List[APIKeyResponse],
@@ -64,14 +69,14 @@ def create_api_key(request: CreateAPIKeyRequest):
 
 
 @router.post(
-    "/api-keys/{api_key_id}/revoke",
+    "/api-keys/revoke",
     response_model=APIKeyResponse,
     summary="Revoke API Key",
-    description="Changes the API key status to revoked.",
+    description="Changes the API key status to revoked when the provided user owns the key.",
 )
-def revoke_api_key(api_key_id: str):
+def revoke_api_key(request: RevokeAPIKeyRequest):
     try:
-        api_key = revoke_api_key_service(api_key_id)
+        api_key = revoke_api_key_service(request.api_key_id, request.user_id)
         return APIKeyResponse(**api_key)
     except HTTPException:
         raise

@@ -80,15 +80,20 @@ def get_user_api_keys(user_id: str) -> list[dict]:
         db.close()
 
 
-def revoke_api_key(api_key_id: str) -> dict:
+def revoke_api_key(api_key_id: str, user_id: str) -> dict:
     if not api_key_id:
         raise HTTPException(status_code=400, detail="api_key_id is required")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
 
     db = SessionLocal()
     try:
-        api_key = api_key_repository.revoke(db, api_key_id)
+        api_key = api_key_repository.get_by_id(db, api_key_id)
         if not api_key:
             raise HTTPException(status_code=404, detail="API key not found")
+        if str(api_key.user_id) != user_id:
+            raise HTTPException(status_code=403, detail="You are not allowed to revoke this API key")
+        api_key = api_key_repository.revoke(db, api_key_id)
         return _serialize_api_key(api_key)
     except SQLAlchemyError as exc:
         db.rollback()

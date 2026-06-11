@@ -15,7 +15,7 @@ from app.routes.kem import router as kem_router
 from app.routes.dsa import router as dsa_router
 from app.routes.api_keys import router as api_keys_router
 from app.routes.audit_logs import router as audit_logs_router
-from app.routes.usage import router as usage_router
+from app.routes.api_usage import router as usage_router
 from app.routes.keygen import router as keygen_router
 
 app = FastAPI(
