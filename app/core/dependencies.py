@@ -1,7 +1,6 @@
-import time
 from typing import Any
 
-from fastapi import Header, HTTPException, Request, Response
+from fastapi import Header, HTTPException, Request
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.core.database import SessionLocal
@@ -17,7 +16,6 @@ from app.security.request_signature import (
     parse_json_body,
     verify_request_signature,
 )
-from app.services.api_usage_service import record_api_usage
 from app.utils.crypto import sha256_hex
 
 REQUEST_TTL_SECONDS = 300
@@ -106,8 +104,7 @@ def _validate_algorithm(db, request: Request, payload: dict[str, Any], api_key_c
     request.state.algorithm = record.name
 
 
-async def verify_signed_request(request: Request, response: Response):
-    start_time = time.perf_counter()
+async def verify_signed_request(request: Request):
     body = await request.body()
     payload = parse_json_body(body)
     request.state.raw_body = body
@@ -246,22 +243,7 @@ async def verify_signed_request(request: Request, response: Response):
     finally:
         db.close()
 
-    try:
-        yield api_key_context
-    finally:
-        elapsed_ms = int((time.perf_counter() - start_time) * 1000)
-        response_status = getattr(response, "status_code", 200)
-        try:
-            record_api_usage(
-                actor_id=str(api_key_context.user_id),
-                endpoint=request.url.path,
-                http_method=request.method,
-                algorithm=getattr(request.state, "algorithm", None),
-                response_status=response_status,
-                response_time_ms=elapsed_ms,
-            )
-        except HTTPException:
-            pass
+    yield api_key_context
 
 
 validate_api_key = verify_signed_request

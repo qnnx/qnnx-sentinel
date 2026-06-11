@@ -10,13 +10,13 @@ class ApiUsageRepository:
     def get_by_id(self, db: Session, usage_id: str):
         return db.query(ApiUsage).filter(ApiUsage.id == usage_id).first()
 
-    def get_by_actor_id(self, db: Session, actor_id: str):
-        return db.query(ApiUsage).filter(ApiUsage.actor_id == actor_id).all()
+    def get_by_user_id(self, db: Session, user_id: str):
+        return db.query(ApiUsage).filter(ApiUsage.user_id == user_id).all()
 
-    def get_recent_by_actor_id(self, db: Session, actor_id: str, limit: int = 10):
+    def get_recent_by_user_id(self, db: Session, user_id: str, limit: int = 10):
         return (
             db.query(ApiUsage)
-            .filter(ApiUsage.actor_id == actor_id)
+            .filter(ApiUsage.user_id == user_id)
             .order_by(ApiUsage.created_at.desc())
             .limit(limit)
             .all()

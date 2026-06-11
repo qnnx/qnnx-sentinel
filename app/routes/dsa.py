@@ -1,46 +1,39 @@
-import base64
-import binascii
-
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.core.dependencies import verify_signed_request
+from app.schemas.api_key import ApiKeyContext
 from app.schemas.dsa import (
     SignRequest,
     SignResponse,
     VerifyRequest,
     VerifyResponse
 )
-from app.services import dsa_service
+from app.services.pqc_operation_service import run_sign_operation, run_verify_operation
 
 router = APIRouter()
 
-
-def _decode_base64(value: str, field_name: str) -> bytes:
-    try:
-        return base64.b64decode(value, validate=True)
-    except (binascii.Error, ValueError) as exc:
-        raise HTTPException(status_code=400, detail=f"Invalid Base64 for {field_name}") from exc
-
-
-def _encode_base64(value: bytes) -> str:
-    return base64.b64encode(value).decode("ascii")
-
 @router.post(
     "/sign",
-    dependencies=[Depends(verify_signed_request)],
     response_model=SignResponse,
     summary="Sign Message",
     description="Sign a message using a private key."
 )
-def sign_message(request: SignRequest):
+def sign_message(
+    request: SignRequest,
+    http_request: Request,
+    api_key_context: ApiKeyContext = Depends(verify_signed_request),
+):
     try:
-        private_key = _decode_base64(request.private_key, "private_key")
-        result = dsa_service.sign_message(
-            request.algorithm,
-            request.message.encode("utf-8"),
-            private_key,
+        return SignResponse(
+            **run_sign_operation(
+                api_key_context=api_key_context,
+                algorithm=request.algorithm,
+                message=request.message,
+                private_key=request.private_key,
+                endpoint=http_request.url.path,
+                method=http_request.method,
+            )
         )
-        return SignResponse(signature=_encode_base64(result["signature"]))
     except HTTPException:
         raise
     except Exception as exc:
@@ -48,22 +41,27 @@ def sign_message(request: SignRequest):
 
 @router.post(
     "/verify",
-    dependencies=[Depends(verify_signed_request)],
     response_model=VerifyResponse,
     summary="Verify Signature",
     description="Verify a message signature using a public key."
 )
-def verify_signature(request: VerifyRequest):
+def verify_signature(
+    request: VerifyRequest,
+    http_request: Request,
+    api_key_context: ApiKeyContext = Depends(verify_signed_request),
+):
     try:
-        signature = _decode_base64(request.signature, "signature")
-        public_key = _decode_base64(request.public_key, "public_key")
-        result = dsa_service.verify_signature(
-            request.algorithm,
-            request.message.encode("utf-8"),
-            signature,
-            public_key,
+        return VerifyResponse(
+            **run_verify_operation(
+                api_key_context=api_key_context,
+                algorithm=request.algorithm,
+                message=request.message,
+                signature=request.signature,
+                public_key=request.public_key,
+                endpoint=http_request.url.path,
+                method=http_request.method,
+            )
         )
-        return VerifyResponse(is_valid=result["is_valid"])
     except HTTPException:
         raise
     except Exception as exc:

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Text, DateTime
+from sqlalchemy import Boolean, Column, DateTime, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 
@@ -18,6 +18,8 @@ class Key(Base):
 
     public_key = Column(Text, nullable=False)
     private_key_ref = Column(Text)
+    storage_mode = Column(Text, nullable=False, server_default=text("'customer_managed'"))
+    private_key_exported = Column(Boolean, nullable=False, server_default=text("false"))
 
     expires_at = Column(DateTime(timezone=True))
 

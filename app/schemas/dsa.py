@@ -1,9 +1,5 @@
 from pydantic import BaseModel
 
-# REQUESTS
-class KeyGenRequest(BaseModel):
-    algorithm: str
-
 class SignRequest(BaseModel):
     algorithm: str
     message: str
@@ -15,13 +11,12 @@ class VerifyRequest(BaseModel):
     signature: str
     public_key: str
 
-# RESPONSES
-class KeyGenResponse(BaseModel):
-    public_key: str
-    private_key: str
-
 class SignResponse(BaseModel):
+    algorithm: str
     signature: str
+    status: str
 
 class VerifyResponse(BaseModel):
+    algorithm: str
     is_valid: bool
+    status: str
