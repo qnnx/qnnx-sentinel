@@ -10,3 +10,5 @@ zota.py
 .env
 QNNX_Sentinel/
 report.md
+scripts/
+test.json

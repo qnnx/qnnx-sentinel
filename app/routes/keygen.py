@@ -26,6 +26,8 @@ def generate_keys(
                 storage_mode=request.storage_mode,
                 endpoint=http_request.url.path,
                 method=http_request.method,
+                ip_address=http_request.client.host if http_request.client else None,
+                user_agent=http_request.headers.get("user-agent"),
             )
         )
     except HTTPException:

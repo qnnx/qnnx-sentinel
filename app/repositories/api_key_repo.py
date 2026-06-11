@@ -44,7 +44,7 @@ class APIKeyRepository:
             db,
             api_key_id,
             {
-                "is_active": False,
+                "status": "revoked",
                 "revoked_at": datetime.now(timezone.utc),
             },
         )

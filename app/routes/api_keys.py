@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.core.dependencies import get_current_user
 from app.schemas.api_key import (
     ApiKeyResponse,
     CreateApiKeyRequest,
@@ -18,11 +19,11 @@ router = APIRouter()
     "/api-keys",
     response_model=list[ApiKeyResponse],
     summary="Get API Keys",
-    description="Returns all API keys for the provided user ID."
+    description="Returns all API keys for the authenticated user."
 )
-def get_api_keys(user_id: str = Query(...)):
+def get_api_keys(current_user=Depends(get_current_user)):
     try:
-        api_keys = get_user_api_keys(user_id)
+        api_keys = get_user_api_keys(current_user["id"])
         return [ApiKeyResponse(**api_key) for api_key in api_keys]
     except HTTPException:
         raise
@@ -33,11 +34,11 @@ def get_api_keys(user_id: str = Query(...)):
     "/api-keys",
     response_model=CreateApiKeyResponse,
     summary="Create API Key",
-    description="Creates a new API key for the provided user ID and returns it once."
+    description="Creates a new API key for the authenticated user and returns it once."
 )
-def create_api_key(request: CreateApiKeyRequest):
+def create_api_key(request: CreateApiKeyRequest, current_user=Depends(get_current_user)):
     try:
-        api_key = create_api_key_service(request.user_id, request.name)
+        api_key = create_api_key_service(current_user["id"], request.name)
         return CreateApiKeyResponse(**api_key)
     except HTTPException:
         raise
@@ -51,9 +52,9 @@ def create_api_key(request: CreateApiKeyRequest):
     summary="Revoke API Key",
     description="Changes the API key status to revoked when the provided user owns the key.",
 )
-def revoke_api_key(request: RevokeApiKeyRequest):
+def revoke_api_key(request: RevokeApiKeyRequest, current_user=Depends(get_current_user)):
     try:
-        api_key = revoke_api_key_service(request.api_key_id, request.user_id)
+        api_key = revoke_api_key_service(str(request.api_key_id), current_user["id"])
         return ApiKeyResponse(**api_key)
     except HTTPException:
         raise

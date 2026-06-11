@@ -22,8 +22,9 @@ def _serialize_usage_record(usage: ApiUsage) -> dict:
         "response_status": usage.response_status,
         "response_time_ms": usage.response_time_ms,
         "success": usage.success,
+        "ip_address": usage.ip_address,
+        "user_agent": usage.user_agent,
         "error_type": usage.error_type,
-        "request_count": usage.request_count,
         "created_at": usage.created_at.isoformat() if usage.created_at else None,
     }
 
@@ -37,7 +38,9 @@ def record_api_usage(
     operation: str | None = None,
     algorithm: str | None = None,
     response_time_ms: int | None = None,
-    success: bool | None = None,
+    success: bool = True,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
     error_type: str | None = None,
 ) -> dict:
     if not endpoint or not endpoint.strip():
@@ -62,8 +65,9 @@ def record_api_usage(
                 "response_status": int(response_status),
                 "response_time_ms": response_time_ms,
                 "success": success,
+                "ip_address": ip_address,
+                "user_agent": user_agent,
                 "error_type": error_type,
-                "request_count": 1,
             },
         )
         return _serialize_usage_record(usage)
@@ -100,6 +104,20 @@ def get_user_usage_summary(user_id: str) -> dict:
         }
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=500, detail="Failed to fetch usage summary") from exc
+    finally:
+        db.close()
+
+
+def get_user_usage_records(user_id: str) -> list[dict]:
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
+
+    db = SessionLocal()
+    try:
+        usage_records = api_usage_repository.get_by_user_id(db, user_id)
+        return [_serialize_usage_record(item) for item in usage_records]
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail="Failed to fetch usage records") from exc
     finally:
         db.close()
 

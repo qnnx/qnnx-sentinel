@@ -42,15 +42,41 @@ def _record_operation(
     audit_action: str,
     audit_status: str,
     details: dict,
+    api_key_id: str | None = None,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+    resource_type: str | None = None,
+    resource_id: str | None = None,
     error_type: str | None = None,
 ):
     try:
         create_audit_log(
             action=audit_action,
             user_id=str(api_key_context.user_id),
-            api_key_id=str(api_key_context.id),
+            api_key_id=api_key_id or str(api_key_context.id),
             status=audit_status,
+            ip_address=ip_address,
+            resource_type=resource_type,
+            resource_id=resource_id,
             details=details,
+        )
+    except HTTPException:
+        pass
+
+    try:
+        record_api_usage(
+            user_id=str(api_key_context.user_id),
+            api_key_id=str(api_key_context.id),
+            endpoint=endpoint,
+            method=method,
+            operation=operation,
+            algorithm=algorithm,
+            response_status=response_status,
+            response_time_ms=response_time_ms,
+            success=success,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            error_type=error_type,
         )
     except HTTPException:
         pass
@@ -68,6 +94,11 @@ def _record_failure(
     audit_action: str,
     error_type: str,
     details: dict,
+    api_key_id: str | None = None,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+    resource_type: str | None = None,
+    resource_id: str | None = None,
 ):
     _record_operation(
         api_key_context=api_key_context,
@@ -80,25 +111,14 @@ def _record_failure(
         response_time_ms=response_time_ms,
         audit_action=audit_action,
         audit_status="failed",
+        api_key_id=api_key_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        resource_type=resource_type,
+        resource_id=resource_id,
         error_type=error_type,
         details=details,
     )
-
-    try:
-        record_api_usage(
-            user_id=str(api_key_context.user_id),
-            api_key_id=str(api_key_context.id),
-            endpoint=endpoint,
-            method=method,
-            operation=operation,
-            algorithm=algorithm,
-            response_status=response_status,
-            response_time_ms=response_time_ms,
-            success=success,
-            error_type=error_type,
-        )
-    except HTTPException:
-        pass
 
 
 def _resolve_algorithm_record(algorithm: str):
@@ -128,6 +148,8 @@ def generate_and_store_keypair(
     storage_mode: str,
     endpoint: str,
     method: str,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
 ) -> dict:
     start = time.perf_counter()
     try:
@@ -184,6 +206,10 @@ def generate_and_store_keypair(
             response_time_ms=elapsed_ms,
             audit_action="KEY_GENERATED",
             audit_status="success",
+            resource_type="key",
+            resource_id=str(key.id),
+            ip_address=ip_address,
+            user_agent=user_agent,
             details={
                 "algorithm": raw_response["algorithm"],
                 "operation": "keygen",
@@ -207,6 +233,9 @@ def generate_and_store_keypair(
             response_status=exc.status_code,
             response_time_ms=elapsed_ms,
             audit_action="KEY_GENERATION_FAILED",
+            ip_address=ip_address,
+            user_agent=user_agent,
+            resource_type="key",
             error_type=exc.detail if isinstance(exc.detail, str) else "HTTP_ERROR",
             details={
                 "algorithm": algorithm,
@@ -229,6 +258,9 @@ def generate_and_store_keypair(
             response_status=500,
             response_time_ms=elapsed_ms,
             audit_action="KEY_GENERATION_FAILED",
+            ip_address=ip_address,
+            user_agent=user_agent,
+            resource_type="key",
             error_type="DATABASE_ERROR",
             details={
                 "algorithm": algorithm,
@@ -249,6 +281,8 @@ def run_kem_encapsulation(
     public_key: str,
     endpoint: str,
     method: str,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
 ) -> dict:
     start = time.perf_counter()
     try:
@@ -272,6 +306,9 @@ def run_kem_encapsulation(
             response_time_ms=elapsed_ms,
             audit_action="KEM_ENCAPSULATED",
             audit_status="success",
+            resource_type="kem_operation",
+            ip_address=ip_address,
+            user_agent=user_agent,
             details={
                 "algorithm": result["algorithm"],
                 "operation": "kem_encapsulate",
@@ -293,6 +330,9 @@ def run_kem_encapsulation(
             response_status=exc.status_code,
             response_time_ms=elapsed_ms,
             audit_action="KEM_ENCAPSULATION_FAILED",
+            ip_address=ip_address,
+            user_agent=user_agent,
+            resource_type="kem_operation",
             error_type=exc.detail if isinstance(exc.detail, str) else "HTTP_ERROR",
             details={
                 "algorithm": algorithm,
@@ -314,6 +354,8 @@ def run_kem_decapsulation(
     private_key: str,
     endpoint: str,
     method: str,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
 ) -> dict:
     start = time.perf_counter()
     try:
@@ -337,6 +379,9 @@ def run_kem_decapsulation(
             response_time_ms=elapsed_ms,
             audit_action="KEM_DECAPSULATED",
             audit_status="success",
+            resource_type="kem_operation",
+            ip_address=ip_address,
+            user_agent=user_agent,
             details={
                 "algorithm": result["algorithm"],
                 "operation": "kem_decapsulate",
@@ -358,6 +403,9 @@ def run_kem_decapsulation(
             response_status=exc.status_code,
             response_time_ms=elapsed_ms,
             audit_action="KEM_DECAPSULATION_FAILED",
+            ip_address=ip_address,
+            user_agent=user_agent,
+            resource_type="kem_operation",
             error_type=exc.detail if isinstance(exc.detail, str) else "HTTP_ERROR",
             details={
                 "algorithm": algorithm,
@@ -379,6 +427,8 @@ def run_sign_operation(
     private_key: str,
     endpoint: str,
     method: str,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
 ) -> dict:
     start = time.perf_counter()
     try:
@@ -401,6 +451,9 @@ def run_sign_operation(
             response_time_ms=elapsed_ms,
             audit_action="SIGNATURE_CREATED",
             audit_status="success",
+            resource_type="signature_operation",
+            ip_address=ip_address,
+            user_agent=user_agent,
             details={
                 "algorithm": result["algorithm"],
                 "operation": "sign",
@@ -422,6 +475,9 @@ def run_sign_operation(
             response_status=exc.status_code,
             response_time_ms=elapsed_ms,
             audit_action="SIGNATURE_CREATION_FAILED",
+            ip_address=ip_address,
+            user_agent=user_agent,
+            resource_type="signature_operation",
             error_type=exc.detail if isinstance(exc.detail, str) else "HTTP_ERROR",
             details={
                 "algorithm": algorithm,
@@ -444,6 +500,8 @@ def run_verify_operation(
     public_key: str,
     endpoint: str,
     method: str,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
 ) -> dict:
     start = time.perf_counter()
     try:
@@ -473,6 +531,9 @@ def run_verify_operation(
             response_time_ms=elapsed_ms,
             audit_action="SIGNATURE_VERIFIED" if is_valid else "SIGNATURE_VERIFICATION_FAILED",
             audit_status="success" if is_valid else "failed",
+            resource_type="signature_operation",
+            ip_address=ip_address,
+            user_agent=user_agent,
             details={
                 "algorithm": result["algorithm"],
                 "operation": "verify",
@@ -494,6 +555,9 @@ def run_verify_operation(
             response_status=exc.status_code,
             response_time_ms=elapsed_ms,
             audit_action="SIGNATURE_VERIFICATION_FAILED",
+            ip_address=ip_address,
+            user_agent=user_agent,
+            resource_type="signature_operation",
             error_type=exc.detail if isinstance(exc.detail, str) else "HTTP_ERROR",
             details={
                 "algorithm": algorithm,

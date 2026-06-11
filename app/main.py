@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+import app.models
 from app.core.config import settings
 from app.core.exceptions import (
     bad_request_handler,

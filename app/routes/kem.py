@@ -31,6 +31,8 @@ def kem_encapsulate(
                 public_key=request.public_key,
                 endpoint=http_request.url.path,
                 method=http_request.method,
+                ip_address=http_request.client.host if http_request.client else None,
+                user_agent=http_request.headers.get("user-agent"),
             )
         )
     except HTTPException:
@@ -58,6 +60,8 @@ def kem_decapsulate(
                 private_key=request.private_key,
                 endpoint=http_request.url.path,
                 method=http_request.method,
+                ip_address=http_request.client.host if http_request.client else None,
+                user_agent=http_request.headers.get("user-agent"),
             )
         )
     except HTTPException:
