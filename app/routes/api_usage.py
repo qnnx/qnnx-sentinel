@@ -38,7 +38,7 @@ MOCK_USAGE = [
 ]
 
 @router.get(
-    "/usage",
+    "/api-usage",
     response_model=List[UsageStat],
     summary="Get API Usage",
     description="Returns API usage statistics for all endpoints."
