@@ -1,8 +1,11 @@
-from typing import List
+from fastapi import APIRouter, HTTPException, Query
 
-from fastapi import APIRouter, Body, HTTPException
-from pydantic import BaseModel
-
+from app.schemas.api_key import (
+    ApiKeyResponse,
+    CreateApiKeyRequest,
+    CreateApiKeyResponse,
+    RevokeApiKeyRequest,
+)
 from app.services.api_key_service import (
     create_api_key as create_api_key_service,
     get_user_api_keys,
@@ -11,42 +14,16 @@ from app.services.api_key_service import (
 
 router = APIRouter()
 
-class APIKeyResponse(BaseModel):
-    id: str
-    user_id: str
-    name: str
-    status: str
-    last_used_at: str | None = None
-    created_at: str
-
-
-class CreateAPIKeyRequest(BaseModel):
-    user_id: str
-    name: str
-
-
-class GetAPIKeysRequest(BaseModel):
-    user_id: str
-
-
-class CreateAPIKeyResponse(APIKeyResponse):
-    api_key: str
-
-
-class RevokeAPIKeyRequest(BaseModel):
-    api_key_id: str
-    user_id: str
-
 @router.get(
     "/api-keys",
-    response_model=List[APIKeyResponse],
+    response_model=list[ApiKeyResponse],
     summary="Get API Keys",
     description="Returns all API keys for the provided user ID."
 )
-def get_api_keys(request: GetAPIKeysRequest = Body(...)):
+def get_api_keys(user_id: str = Query(...)):
     try:
-        api_keys = get_user_api_keys(request.user_id)
-        return [APIKeyResponse(**api_key) for api_key in api_keys]
+        api_keys = get_user_api_keys(user_id)
+        return [ApiKeyResponse(**api_key) for api_key in api_keys]
     except HTTPException:
         raise
     except Exception as exc:
@@ -54,14 +31,14 @@ def get_api_keys(request: GetAPIKeysRequest = Body(...)):
 
 @router.post(
     "/api-keys",
-    response_model=CreateAPIKeyResponse,
+    response_model=CreateApiKeyResponse,
     summary="Create API Key",
     description="Creates a new API key for the provided user ID and returns it once."
 )
-def create_api_key(request: CreateAPIKeyRequest):
+def create_api_key(request: CreateApiKeyRequest):
     try:
         api_key = create_api_key_service(request.user_id, request.name)
-        return CreateAPIKeyResponse(**api_key)
+        return CreateApiKeyResponse(**api_key)
     except HTTPException:
         raise
     except Exception as exc:
@@ -70,14 +47,14 @@ def create_api_key(request: CreateAPIKeyRequest):
 
 @router.post(
     "/api-keys/revoke",
-    response_model=APIKeyResponse,
+    response_model=ApiKeyResponse,
     summary="Revoke API Key",
     description="Changes the API key status to revoked when the provided user owns the key.",
 )
-def revoke_api_key(request: RevokeAPIKeyRequest):
+def revoke_api_key(request: RevokeApiKeyRequest):
     try:
         api_key = revoke_api_key_service(request.api_key_id, request.user_id)
-        return APIKeyResponse(**api_key)
+        return ApiKeyResponse(**api_key)
     except HTTPException:
         raise
     except Exception as exc:

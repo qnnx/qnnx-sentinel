@@ -3,7 +3,7 @@ import binascii
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.core.dependencies import validate_api_key
+from app.core.dependencies import verify_signed_request
 from app.schemas.kem import (
     EncapsulationRequest,
     EncapsulationResponse,
@@ -27,7 +27,7 @@ def _encode_base64(value: bytes) -> str:
 
 @router.post(
     "/kem/encapsulate",
-    dependencies=[Depends(validate_api_key)],
+    dependencies=[Depends(verify_signed_request)],
     response_model=EncapsulationResponse,
     summary="KEM Encapsulate",
     description="Encapsulate a shared secret using a public key."
@@ -47,7 +47,7 @@ def kem_encapsulate(request: EncapsulationRequest):
 
 @router.post(
     "/kem/decapsulate",
-    dependencies=[Depends(validate_api_key)],
+    dependencies=[Depends(verify_signed_request)],
     response_model=DecapsulationResponse,
     summary="KEM Decapsulate",
     description="Decapsulate a shared secret using a private key."

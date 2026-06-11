@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.core.dependencies import validate_api_key
+from app.core.dependencies import verify_signed_request
 from app.schemas.keygen import KeyGenRequest, KeyGenResponse
 from app.services.key_service import generate_keypair
 
@@ -8,7 +8,7 @@ router = APIRouter()
 
 @router.post(
     "/keygen",
-    dependencies=[Depends(validate_api_key)],
+    dependencies=[Depends(verify_signed_request)],
     response_model=KeyGenResponse,
     summary="Generate Key Pair",
     description="Generate a public and private key pair for a given PQC algorithm."

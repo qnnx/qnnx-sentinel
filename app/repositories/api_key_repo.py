@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy.orm import Session
 
 from app.models.api_key import ApiKey
@@ -15,7 +17,7 @@ class APIKeyRepository:
         return db.query(ApiKey).filter(ApiKey.key_hash == key_hash).first()
 
     def get_by_user_id(self, db: Session, user_id: str):
-        return db.query(ApiKey).filter(ApiKey.user_id == user_id).all()
+        return db.query(ApiKey).filter(ApiKey.user_id == user_id).order_by(ApiKey.created_at.desc()).all()
 
     def create(self, db: Session, api_key_data: dict):
         api_key = ApiKey(**api_key_data)
@@ -38,7 +40,14 @@ class APIKeyRepository:
         return api_key
 
     def revoke(self, db: Session, api_key_id: str):
-        return self.update(db, api_key_id, {"status": "revoked"})
+        return self.update(
+            db,
+            api_key_id,
+            {
+                "is_active": False,
+                "revoked_at": datetime.now(timezone.utc),
+            },
+        )
 
     def delete(self, db: Session, api_key_id: str):
         api_key = self.get_by_id(db, api_key_id)

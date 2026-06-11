@@ -3,7 +3,7 @@ import binascii
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.core.dependencies import validate_api_key
+from app.core.dependencies import verify_signed_request
 from app.schemas.dsa import (
     SignRequest,
     SignResponse,
@@ -27,7 +27,7 @@ def _encode_base64(value: bytes) -> str:
 
 @router.post(
     "/sign",
-    dependencies=[Depends(validate_api_key)],
+    dependencies=[Depends(verify_signed_request)],
     response_model=SignResponse,
     summary="Sign Message",
     description="Sign a message using a private key."
@@ -48,7 +48,7 @@ def sign_message(request: SignRequest):
 
 @router.post(
     "/verify",
-    dependencies=[Depends(validate_api_key)],
+    dependencies=[Depends(verify_signed_request)],
     response_model=VerifyResponse,
     summary="Verify Signature",
     description="Verify a message signature using a public key."

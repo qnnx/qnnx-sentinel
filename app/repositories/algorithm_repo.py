@@ -16,6 +16,17 @@ class AlgorithmRepository:
     def get_by_name(self, db: Session, name: str):
         return db.query(Algorithm).filter(func.lower(Algorithm.name) == name.lower()).first()
 
+    def get_by_identifier(self, db: Session, identifier: str):
+        normalized = identifier.lower()
+        return (
+            db.query(Algorithm)
+            .filter(
+                (func.lower(Algorithm.name) == normalized)
+                | (func.lower(Algorithm.algo_id) == normalized)
+            )
+            .first()
+        )
+
     def create(self, db: Session, algorithm_data: dict):
         algorithm = Algorithm(**algorithm_data)
         db.add(algorithm)
