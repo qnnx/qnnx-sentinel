@@ -9,13 +9,29 @@ class AuditLogRepository:
 
     def get_by_id(self, db: Session, log_id: str):
         return db.query(AuditLog).filter(AuditLog.id == log_id).first()
+   def update(self, db: Session, log_id: str, update_data: dict):
+    log = self.get_by_id(db, log_id)
 
-    def get_by_user_id(self, db: Session, user_id: str):
-        return db.query(AuditLog).filter(AuditLog.user_id == user_id).all()
+<<<<<<< HEAD
+    if not log:
+        return None
+
+    for key, value in update_data.items():
+        setattr(log, key, value)
+
+    db.commit()
+    db.refresh(log)
+
+    return log
+    
+=======
+    def get_by_actor_id(self, db: Session, actor_id: str):
+        return db.query(AuditLog).filter(AuditLog.actor_id == actor_id).all()
 
     def get_by_action(self, db: Session, action: str):
         return db.query(AuditLog).filter(AuditLog.action == action).all()
 
+>>>>>>> 4a987a9d0f44393fbbb5cda33d01cbe5d5eb36fa
     def create(self, db: Session, log_data: dict):
         log = AuditLog(**log_data)
         db.add(log)
