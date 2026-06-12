@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 import app.models
 from app.core.config import settings
@@ -18,6 +18,10 @@ from app.routes.api_keys import router as api_keys_router
 from app.routes.audit_logs import router as audit_logs_router
 from app.routes.api_usage import router as usage_router
 from app.routes.keygen import router as keygen_router
+from app.core.limiter import limiter
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.errors import RateLimitExceeded
+from fastapi.responses import JSONResponse
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -27,6 +31,22 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+# Store the limiter in the app state
+app.state.limiter = limiter
+
+# Add the SlowAPI middleware to intercept requests
+app.add_middleware(SlowAPIMiddleware)
+
+def rate_limit_custom_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={
+            "success": False,
+            "status_code": 429,
+            "error": "Rate limit exceeded"
+        }
+    )
+
 # Error Handlers
 app.add_exception_handler(400, bad_request_handler)
 app.add_exception_handler(401, unauthorized_handler)
@@ -34,6 +54,7 @@ app.add_exception_handler(403, forbidden_handler)
 app.add_exception_handler(404, not_found_handler)
 app.add_exception_handler(RequestValidationError, validation_error_handler)
 app.add_exception_handler(500, internal_server_error_handler)
+app.add_exception_handler(RateLimitExceeded, rate_limit_custom_handler)
 
 # Routes
 app.include_router(health_router, prefix=settings.API_V1_STR, tags=["Health"])

@@ -8,6 +8,10 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     DATABASE_URL: str
     DISABLE_SIGNED_REQUEST_GUARDS: bool = False
+    KEYGEN_RATE_LIMIT: str = "30/minute"
+    KEM_RATE_LIMIT: str = "100/minute"
+    SIGN_RATE_LIMIT: str = "60/minute"
+    VERIFY_RATE_LIMIT: str = "120/minute"
 
     class Config:
         env_file = ".env"

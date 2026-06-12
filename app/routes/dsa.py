@@ -1,5 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+# NEW: Import our settings and limiter
+from app.core.config import settings
+from app.core.limiter import limiter
+
 from app.core.dependencies import verify_signed_request
 from app.schemas.api_key import ApiKeyContext
 from app.schemas.dsa import (
@@ -18,22 +22,23 @@ router = APIRouter()
     summary="Sign Message",
     description="Sign a message using a private key."
 )
+@limiter.limit(settings.SIGN_RATE_LIMIT) # NEW: Apply SIGN limit (60/min)
 def sign_message(
-    request: SignRequest,
-    http_request: Request,
+    request: Request,                   # RENAMED: from http_request to request
+    payload: SignRequest,               # RENAMED: from request to payload
     api_key_context: ApiKeyContext = Depends(verify_signed_request),
 ):
     try:
         return SignResponse(
             **run_sign_operation(
                 api_key_context=api_key_context,
-                algorithm=request.algorithm,
-                message=request.message,
-                private_key=request.private_key,
-                endpoint=http_request.url.path,
-                method=http_request.method,
-                ip_address=http_request.client.host if http_request.client else None,
-                user_agent=http_request.headers.get("user-agent"),
+                algorithm=payload.algorithm,       # UPDATED to use payload
+                message=payload.message,           # UPDATED to use payload
+                private_key=payload.private_key,   # UPDATED to use payload
+                endpoint=request.url.path,         # UPDATED to use request
+                method=request.method,             # UPDATED to use request
+                ip_address=request.client.host if request.client else None, # UPDATED
+                user_agent=request.headers.get("user-agent"),               # UPDATED
             )
         )
     except HTTPException:
@@ -47,23 +52,24 @@ def sign_message(
     summary="Verify Signature",
     description="Verify a message signature using a public key."
 )
+@limiter.limit(settings.VERIFY_RATE_LIMIT) # NEW: Apply VERIFY limit (120/min)
 def verify_signature(
-    request: VerifyRequest,
-    http_request: Request,
+    request: Request,                   # RENAMED: from http_request to request
+    payload: VerifyRequest,             # RENAMED: from request to payload
     api_key_context: ApiKeyContext = Depends(verify_signed_request),
 ):
     try:
         return VerifyResponse(
             **run_verify_operation(
                 api_key_context=api_key_context,
-                algorithm=request.algorithm,
-                message=request.message,
-                signature=request.signature,
-                public_key=request.public_key,
-                endpoint=http_request.url.path,
-                method=http_request.method,
-                ip_address=http_request.client.host if http_request.client else None,
-                user_agent=http_request.headers.get("user-agent"),
+                algorithm=payload.algorithm,       # UPDATED to use payload
+                message=payload.message,           # UPDATED to use payload
+                signature=payload.signature,       # UPDATED to use payload
+                public_key=payload.public_key,     # UPDATED to use payload
+                endpoint=request.url.path,         # UPDATED to use request
+                method=request.method,             # UPDATED to use request
+                ip_address=request.client.host if request.client else None, # UPDATED
+                user_agent=request.headers.get("user-agent"),               # UPDATED
             )
         )
     except HTTPException:
