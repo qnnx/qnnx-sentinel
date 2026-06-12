@@ -1,45 +1,40 @@
-from fastapi import APIRouter
-from typing import List
-from pydantic import BaseModel
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.core.dependencies import get_current_user
+from app.schemas.audit_logs import AuditLogResponse
+from app.services.audit_log_service import get_audit_log_by_id, get_user_audit_logs
 
 router = APIRouter()
 
-class AuditLog(BaseModel):
-    id: str
-    action: str
-    user_id: str
-    timestamp: str
-    details: str
-
-MOCK_AUDIT_LOGS = [
-    AuditLog(
-        id="log-001",
-        action="kem_encapsulate",
-        user_id="mock-user",
-        timestamp="2026-06-10T10:00:00",
-        details="KEM encapsulation performed with ML-KEM-768"
-    ),
-    AuditLog(
-        id="log-002",
-        action="sign",
-        user_id="mock-user",
-        timestamp="2026-06-10T11:00:00",
-        details="Message signed with ML-DSA-65"
-    ),
-    AuditLog(
-        id="log-003",
-        action="verify",
-        user_id="mock-user",
-        timestamp="2026-06-10T12:00:00",
-        details="Signature verified with ML-DSA-65"
-    ),
-]
-
 @router.get(
     "/audit-logs",
-    response_model=List[AuditLog],
+    response_model=list[AuditLogResponse],
     summary="Get Audit Logs",
-    description="Returns all audit logs."
+    description="Returns all audit logs for the authenticated user."
 )
-def get_audit_logs():
-    return MOCK_AUDIT_LOGS
+def get_audit_logs(current_user=Depends(get_current_user)):
+    try:
+        logs = get_user_audit_logs(current_user["id"])
+        return [AuditLogResponse(**log) for log in logs]
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch audit logs: {exc}") from exc
+
+
+@router.get(
+    "/audit-logs/{log_id}",
+    response_model=AuditLogResponse,
+    summary="Get Audit Log By ID",
+    description="Returns a single audit log for the authenticated user."
+)
+def get_audit_log(log_id: UUID, current_user=Depends(get_current_user)):
+    try:
+        log = get_audit_log_by_id(current_user["id"], str(log_id))
+        return AuditLogResponse(**log)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch audit log: {exc}") from exc

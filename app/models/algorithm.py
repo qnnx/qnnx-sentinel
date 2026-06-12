@@ -1,3 +1,4 @@
+import uuid
 from sqlalchemy import Column, Text, Integer, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
@@ -9,7 +10,12 @@ class Algorithm(Base):
     __tablename__ = "algorithms"
     __table_args__ = {"schema": "crypto"}
 
-    id = Column(UUID(as_uuid=True), primary_key=True)
+    id = Column(
+    UUID(as_uuid=True),
+    primary_key=True,
+    default=uuid.uuid4
+)
+    # New field added to match Supabase
     algo_id = Column(Text, unique=True, nullable=False)
 
     name = Column(Text, unique=True, nullable=False)
@@ -19,10 +25,9 @@ class Algorithm(Base):
 
     nist_standard = Column(Text, nullable=False)
 
-    status = Column(Text, nullable=False, default="active")
+    status = Column(Text, nullable=False)
 
     recommended_use = Column(Text)
-
     description = Column(Text)
 
     created_at = Column(

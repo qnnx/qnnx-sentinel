@@ -1,47 +1,58 @@
-from fastapi import APIRouter
-from pydantic import BaseModel
-from typing import List
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from app.core.dependencies import get_current_user
+from app.schemas.api_usage import ApiUsageResponse, ApiUsageSummaryResponse
+from app.services.api_usage_service import (
+    get_recent_usage_activity,
+    get_user_usage_records,
+    get_user_usage_summary,
+)
 
 router = APIRouter()
 
-class UsageStat(BaseModel):
-    endpoint: str
-    total_calls: int
-    last_called: str
+@router.get(
+    "/api-usage",
+    response_model=list[ApiUsageResponse],
+    summary="Get API Usage",
+    description="Returns API usage records for the authenticated user."
+)
+def get_usage(current_user=Depends(get_current_user)):
+    try:
+        usage_records = get_user_usage_records(current_user["id"])
+        return [ApiUsageResponse(**record) for record in usage_records]
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch API usage: {exc}") from exc
 
-MOCK_USAGE = [
-    UsageStat(
-        endpoint="/api/v1/kem/encapsulate",
-        total_calls=150,
-        last_called="2026-06-10T12:00:00"
-    ),
-    UsageStat(
-        endpoint="/api/v1/kem/decapsulate",
-        total_calls=148,
-        last_called="2026-06-10T12:01:00"
-    ),
-    UsageStat(
-        endpoint="/api/v1/sign",
-        total_calls=200,
-        last_called="2026-06-10T11:00:00"
-    ),
-    UsageStat(
-        endpoint="/api/v1/verify",
-        total_calls=195,
-        last_called="2026-06-10T11:05:00"
-    ),
-    UsageStat(
-        endpoint="/api/v1/algorithms",
-        total_calls=300,
-        last_called="2026-06-10T10:00:00"
-    ),
-]
 
 @router.get(
-    "/usage",
-    response_model=List[UsageStat],
-    summary="Get API Usage",
-    description="Returns API usage statistics for all endpoints."
+    "/api-usage/recent",
+    response_model=list[ApiUsageResponse],
+    summary="Get Recent API Usage",
+    description="Returns recent API usage records for the authenticated user."
 )
-def get_usage():
-    return MOCK_USAGE
+def get_recent_usage(limit: int = Query(10, ge=1, le=100), current_user=Depends(get_current_user)):
+    try:
+        usage_records = get_recent_usage_activity(current_user["id"], limit=limit)
+        return [ApiUsageResponse(**record) for record in usage_records]
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch recent API usage: {exc}") from exc
+
+
+@router.get(
+    "/api-usage/summary",
+    response_model=ApiUsageSummaryResponse,
+    summary="Get API Usage Summary",
+    description="Returns an API usage summary for the authenticated user."
+)
+def get_usage_summary(current_user=Depends(get_current_user)):
+    try:
+        summary = get_user_usage_summary(current_user["id"])
+        return ApiUsageSummaryResponse(**summary)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch API usage summary: {exc}") from exc

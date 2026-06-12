@@ -1,14 +1,16 @@
-import time
 from typing import Any
+from uuid import UUID
 
-from fastapi import Header, HTTPException, Request, Response
+from fastapi import Header, HTTPException, Request
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
+from app.core.config import settings
 from app.core.database import SessionLocal
 from app.repositories.algorithm_repo import AlgorithmRepository
 from app.repositories.api_key_repo import APIKeyRepository
 from app.repositories.api_nonce_repo import APINonceRepository
 from app.repositories.api_security_event_repo import APISecurityEventRepository
+from app.repositories.user_repo import UserRepository
 from app.schemas.api_key import ApiKeyContext
 from app.security.request_signature import (
     extract_algorithm,
@@ -17,7 +19,7 @@ from app.security.request_signature import (
     parse_json_body,
     verify_request_signature,
 )
-from app.services.api_usage_service import record_api_usage
+from app.services.audit_log_service import create_audit_log
 from app.utils.crypto import sha256_hex
 
 REQUEST_TTL_SECONDS = 300
@@ -27,6 +29,7 @@ api_key_repository = APIKeyRepository()
 api_nonce_repository = APINonceRepository()
 api_security_event_repository = APISecurityEventRepository()
 algorithm_repository = AlgorithmRepository()
+user_repository = UserRepository()
 
 async def get_db():
     db = SessionLocal()
@@ -36,9 +39,40 @@ async def get_db():
         db.close()
 
 async def get_current_user(authorization: str = Header(None)):
-    if authorization is None:
-        return {"id": "mock-user", "name": "Mock User", "role": "admin"}
-    return {"id": "mock-user", "name": "Mock User", "role": "admin"}
+    if authorization is None or not authorization.strip():
+        raise HTTPException(status_code=401, detail="Authorization header is required")
+
+    token = extract_bearer_token(authorization)
+    if not token:
+        raise HTTPException(status_code=401, detail="Invalid Authorization header format")
+
+    try:
+        user_id = str(UUID(token))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=401,
+            detail="Authorization bearer token must be a valid public.users UUID for local testing",
+        ) from exc
+
+    db = SessionLocal()
+    try:
+        existing_user = user_repository.get_by_id(db, user_id)
+        if not existing_user:
+            raise HTTPException(
+                status_code=401,
+                detail="Authenticated user not found in public.users",
+            )
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to resolve authenticated user") from exc
+    finally:
+        db.close()
+
+    return {
+        "id": str(existing_user.id),
+        "name": existing_user.full_name or "Authenticated User",
+        "role": existing_user.role,
+    }
 
 def _build_request_metadata(request: Request) -> dict[str, Any]:
     return {
@@ -55,7 +89,7 @@ def _serialize_api_key(api_key) -> ApiKeyContext:
         user_id=api_key.user_id,
         key_prefix=api_key.key_prefix,
         name=api_key.name,
-        is_active=api_key.is_active,
+        is_active=(api_key.status or "").lower() == "active" and api_key.revoked_at is None,
     )
 
 
@@ -85,6 +119,23 @@ def _create_security_event(
     except SQLAlchemyError:
         db.rollback()
 
+    try:
+        create_audit_log(
+            action=event_type,
+            user_id=str(user_id) if user_id else None,
+            api_key_id=str(api_key_id) if api_key_id else None,
+            status="failed",
+            details={
+                "endpoint": metadata["endpoint"],
+                "method": metadata["method"],
+                "ip_address": metadata["ip_address"],
+                "user_agent": metadata["user_agent"],
+                **(details or {}),
+            },
+        )
+    except HTTPException:
+        pass
+
 
 def _validate_algorithm(db, request: Request, payload: dict[str, Any], api_key_context: ApiKeyContext):
     algorithm = extract_algorithm(payload)
@@ -106,14 +157,14 @@ def _validate_algorithm(db, request: Request, payload: dict[str, Any], api_key_c
     request.state.algorithm = record.name
 
 
-async def verify_signed_request(request: Request, response: Response):
-    start_time = time.perf_counter()
+async def verify_signed_request(request: Request):
     body = await request.body()
     payload = parse_json_body(body)
     request.state.raw_body = body
     request.state.algorithm = extract_algorithm(payload)
 
     authorization = request.headers.get("Authorization")
+    signing_secret = request.headers.get("X-QNNX-Signing-Secret")
     timestamp = request.headers.get("X-QNNX-Timestamp")
     nonce = request.headers.get("X-QNNX-Nonce")
     signature = request.headers.get("X-QNNX-Signature")
@@ -121,11 +172,13 @@ async def verify_signed_request(request: Request, response: Response):
     missing_headers = []
     if not authorization:
         missing_headers.append("Authorization")
-    if not timestamp:
+    if not settings.DISABLE_SIGNED_REQUEST_GUARDS and not signing_secret:
+        missing_headers.append("X-QNNX-Signing-Secret")
+    if not settings.DISABLE_SIGNED_REQUEST_GUARDS and not timestamp:
         missing_headers.append("X-QNNX-Timestamp")
-    if not nonce:
+    if not settings.DISABLE_SIGNED_REQUEST_GUARDS and not nonce:
         missing_headers.append("X-QNNX-Nonce")
-    if not signature:
+    if not settings.DISABLE_SIGNED_REQUEST_GUARDS and not signature:
         missing_headers.append("X-QNNX-Signature")
 
     db = SessionLocal()
@@ -152,7 +205,7 @@ async def verify_signed_request(request: Request, response: Response):
             raise HTTPException(status_code=401, detail="Invalid API key")
 
         api_key = api_key_repository.get_by_hash(db, sha256_hex(raw_api_key))
-        if not api_key or not api_key.is_active or api_key.revoked_at is not None:
+        if not api_key or (api_key.status or "").lower() != "active" or api_key.revoked_at is not None:
             _create_security_event(
                 db,
                 request,
@@ -161,107 +214,106 @@ async def verify_signed_request(request: Request, response: Response):
             )
             raise HTTPException(status_code=401, detail="Invalid API key")
 
-        api_key_context = _serialize_api_key(api_key)
-
-        try:
-            timestamp_is_fresh = is_timestamp_fresh(timestamp, REQUEST_TTL_SECONDS)
-        except HTTPException as exc:
-            _create_security_event(
-                db,
-                request,
-                "EXPIRED_REQUEST",
-                details={"timestamp": timestamp, "reason": exc.detail},
-                user_id=api_key_context.user_id,
-                api_key_id=api_key_context.id,
-            )
-            raise
-
-        if not timestamp_is_fresh:
-            _create_security_event(
-                db,
-                request,
-                "EXPIRED_REQUEST",
-                details={"timestamp": timestamp},
-                user_id=api_key_context.user_id,
-                api_key_id=api_key_context.id,
-            )
-            raise HTTPException(status_code=401, detail="Expired request")
-
-        if not verify_request_signature(
-            provided_signature=signature,
-            method=request.method,
-            path=request.url.path,
-            timestamp=timestamp,
-            nonce=nonce,
-            body=body,
-            secret=raw_api_key,
+        if (
+            not settings.DISABLE_SIGNED_REQUEST_GUARDS
+            and api_key.signing_secret_hash != sha256_hex(signing_secret)
         ):
             _create_security_event(
                 db,
                 request,
-                "INVALID_SIGNATURE",
-                details={"nonce": nonce, "timestamp": timestamp},
-                user_id=api_key_context.user_id,
-                api_key_id=api_key_context.id,
+                "INVALID_SIGNING_SECRET",
+                details={"key_prefix": raw_api_key[:12]},
             )
-            raise HTTPException(status_code=401, detail="Invalid signature")
+            raise HTTPException(status_code=401, detail="Invalid signing secret")
+
+        api_key_context = _serialize_api_key(api_key)
+
+        if not settings.DISABLE_SIGNED_REQUEST_GUARDS:
+            try:
+                timestamp_is_fresh = is_timestamp_fresh(timestamp, REQUEST_TTL_SECONDS)
+            except HTTPException as exc:
+                _create_security_event(
+                    db,
+                    request,
+                    "EXPIRED_REQUEST",
+                    details={"timestamp": timestamp, "reason": exc.detail},
+                    user_id=api_key_context.user_id,
+                    api_key_id=api_key_context.id,
+                )
+                raise
+
+            if not timestamp_is_fresh:
+                _create_security_event(
+                    db,
+                    request,
+                    "EXPIRED_REQUEST",
+                    details={"timestamp": timestamp},
+                    user_id=api_key_context.user_id,
+                    api_key_id=api_key_context.id,
+                )
+                raise HTTPException(status_code=401, detail="Expired request")
+
+            if not verify_request_signature(
+                provided_signature=signature,
+                method=request.method,
+                path=request.url.path,
+                timestamp=timestamp,
+                nonce=nonce,
+                body=body,
+                secret=signing_secret,
+            ):
+                _create_security_event(
+                    db,
+                    request,
+                    "INVALID_SIGNATURE",
+                    details={"nonce": nonce, "timestamp": timestamp},
+                    user_id=api_key_context.user_id,
+                    api_key_id=api_key_context.id,
+                )
+                raise HTTPException(status_code=401, detail="Invalid signature")
 
         _validate_algorithm(db, request, payload or {}, api_key_context)
 
-        if api_nonce_repository.get_by_key_and_nonce(db, str(api_key_context.id), nonce):
-            _create_security_event(
-                db,
-                request,
-                "REPLAY_ATTACK",
-                details={"nonce": nonce},
-                user_id=api_key_context.user_id,
-                api_key_id=api_key_context.id,
-            )
-            raise HTTPException(status_code=401, detail="Replay attack detected")
+        if not settings.DISABLE_SIGNED_REQUEST_GUARDS:
+            if api_nonce_repository.get_by_key_and_nonce(db, str(api_key_context.id), nonce):
+                _create_security_event(
+                    db,
+                    request,
+                    "REPLAY_ATTACK",
+                    details={"nonce": nonce},
+                    user_id=api_key_context.user_id,
+                    api_key_id=api_key_context.id,
+                )
+                raise HTTPException(status_code=401, detail="Replay attack detected")
 
-        try:
-            api_nonce_repository.create(
-                db,
-                {
-                    "api_key_id": api_key_context.id,
-                    "nonce": nonce,
-                },
-            )
-        except IntegrityError as exc:
-            db.rollback()
-            _create_security_event(
-                db,
-                request,
-                "REPLAY_ATTACK",
-                details={"nonce": nonce, "reason": "Unique constraint violation"},
-                user_id=api_key_context.user_id,
-                api_key_id=api_key_context.id,
-            )
-            raise HTTPException(status_code=401, detail="Replay attack detected") from exc
+            try:
+                api_nonce_repository.create(
+                    db,
+                    {
+                        "api_key_id": api_key_context.id,
+                        "nonce": nonce,
+                    },
+                )
+            except IntegrityError as exc:
+                db.rollback()
+                _create_security_event(
+                    db,
+                    request,
+                    "REPLAY_ATTACK",
+                    details={"nonce": nonce, "reason": "Unique constraint violation"},
+                    user_id=api_key_context.user_id,
+                    api_key_id=api_key_context.id,
+                )
+                raise HTTPException(status_code=401, detail="Replay attack detected") from exc
     except HTTPException:
         raise
     except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to validate signed request") from exc
+        raise HTTPException(status_code=500, detail=f"Failed to validate signed request: {exc}") from exc
     finally:
         db.close()
 
-    try:
-        yield api_key_context
-    finally:
-        elapsed_ms = int((time.perf_counter() - start_time) * 1000)
-        response_status = getattr(response, "status_code", 200)
-        try:
-            record_api_usage(
-                actor_id=str(api_key_context.user_id),
-                endpoint=request.url.path,
-                http_method=request.method,
-                algorithm=getattr(request.state, "algorithm", None),
-                response_status=response_status,
-                response_time_ms=elapsed_ms,
-            )
-        except HTTPException:
-            pass
+    yield api_key_context
 
 
 validate_api_key = verify_signed_request

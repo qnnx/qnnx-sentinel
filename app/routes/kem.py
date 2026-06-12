@@ -1,44 +1,39 @@
-import base64
-import binascii
+from fastapi import APIRouter, Depends, HTTPException, Request
 
-from fastapi import APIRouter, Depends, HTTPException
-
-from app.core.dependencies import validate_api_key
+from app.core.dependencies import verify_signed_request
+from app.schemas.api_key import ApiKeyContext
 from app.schemas.kem import (
     EncapsulationRequest,
     EncapsulationResponse,
     DecapsulationRequest,
     DecapsulationResponse
 )
-from app.services import kem_service
+from app.services.pqc_operation_service import run_kem_decapsulation, run_kem_encapsulation
 
 router = APIRouter()
 
-
-def _decode_base64(value: str, field_name: str) -> bytes:
-    try:
-        return base64.b64decode(value, validate=True)
-    except (binascii.Error, ValueError) as exc:
-        raise HTTPException(status_code=400, detail=f"Invalid Base64 for {field_name}") from exc
-
-
-def _encode_base64(value: bytes) -> str:
-    return base64.b64encode(value).decode("ascii")
-
 @router.post(
     "/kem/encapsulate",
-    dependencies=[Depends(validate_api_key)],
     response_model=EncapsulationResponse,
     summary="KEM Encapsulate",
     description="Encapsulate a shared secret using a public key."
 )
-def kem_encapsulate(request: EncapsulationRequest):
+def kem_encapsulate(
+    request: EncapsulationRequest,
+    http_request: Request,
+    api_key_context: ApiKeyContext = Depends(verify_signed_request),
+):
     try:
-        public_key = _decode_base64(request.public_key, "public_key")
-        result = kem_service.encapsulate_secret(request.algorithm, public_key)
         return EncapsulationResponse(
-            ciphertext=_encode_base64(result["ciphertext"]),
-            shared_secret=_encode_base64(result["shared_secret"]),
+            **run_kem_encapsulation(
+                api_key_context=api_key_context,
+                algorithm=request.algorithm,
+                public_key=request.public_key,
+                endpoint=http_request.url.path,
+                method=http_request.method,
+                ip_address=http_request.client.host if http_request.client else None,
+                user_agent=http_request.headers.get("user-agent"),
+            )
         )
     except HTTPException:
         raise
@@ -47,18 +42,27 @@ def kem_encapsulate(request: EncapsulationRequest):
 
 @router.post(
     "/kem/decapsulate",
-    dependencies=[Depends(validate_api_key)],
     response_model=DecapsulationResponse,
     summary="KEM Decapsulate",
     description="Decapsulate a shared secret using a private key."
 )
-def kem_decapsulate(request: DecapsulationRequest):
+def kem_decapsulate(
+    request: DecapsulationRequest,
+    http_request: Request,
+    api_key_context: ApiKeyContext = Depends(verify_signed_request),
+):
     try:
-        ciphertext = _decode_base64(request.ciphertext, "ciphertext")
-        private_key = _decode_base64(request.private_key, "private_key")
-        result = kem_service.decapsulate_secret(request.algorithm, ciphertext, private_key)
         return DecapsulationResponse(
-            shared_secret=_encode_base64(result["shared_secret"]),
+            **run_kem_decapsulation(
+                api_key_context=api_key_context,
+                algorithm=request.algorithm,
+                ciphertext=request.ciphertext,
+                private_key=request.private_key,
+                endpoint=http_request.url.path,
+                method=http_request.method,
+                ip_address=http_request.client.host if http_request.client else None,
+                user_agent=http_request.headers.get("user-agent"),
+            )
         )
     except HTTPException:
         raise

@@ -1,52 +1,62 @@
-from fastapi import APIRouter
-from typing import List
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.core.dependencies import get_current_user
+from app.schemas.api_key import (
+    ApiKeyResponse,
+    CreateApiKeyRequest,
+    CreateApiKeyResponse,
+    RevokeApiKeyRequest,
+)
+from app.services.api_key_service import (
+    create_api_key as create_api_key_service,
+    get_user_api_keys,
+    revoke_api_key as revoke_api_key_service,
+)
 
 router = APIRouter()
 
-class APIKey(BaseModel):
-    id: str
-    name: str
-    key: str
-    created_at: str
-
-class CreateAPIKeyRequest(BaseModel):
-    name: str
-
-MOCK_API_KEYS = [
-    APIKey(
-        id="key-001",
-        name="Test Key 1",
-        key="sk-mock-key-001",
-        created_at="2026-01-01T00:00:00"
-    ),
-    APIKey(
-        id="key-002",
-        name="Test Key 2",
-        key="sk-mock-key-002",
-        created_at="2026-01-02T00:00:00"
-    ),
-]
-
 @router.get(
     "/api-keys",
-    response_model=List[APIKey],
+    response_model=list[ApiKeyResponse],
     summary="Get API Keys",
-    description="Returns all API keys."
+    description="Returns all API keys for the authenticated user."
 )
-def get_api_keys():
-    return MOCK_API_KEYS
+def get_api_keys(current_user=Depends(get_current_user)):
+    try:
+        api_keys = get_user_api_keys(current_user["id"])
+        return [ApiKeyResponse(**api_key) for api_key in api_keys]
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch API keys: {exc}") from exc
 
 @router.post(
     "/api-keys",
-    response_model=APIKey,
+    response_model=CreateApiKeyResponse,
     summary="Create API Key",
-    description="Create a new API key."
+    description="Creates a new API key for the authenticated user and returns it once."
 )
-def create_api_key(request: CreateAPIKeyRequest):
-    return APIKey(
-        id="key-003",
-        name=request.name,
-        key="sk-mock-key-003",
-        created_at="2026-06-10T00:00:00"
-    )
+def create_api_key(request: CreateApiKeyRequest, current_user=Depends(get_current_user)):
+    try:
+        api_key = create_api_key_service(current_user["id"], request.name)
+        return CreateApiKeyResponse(**api_key)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to create API key: {exc}") from exc
+
+
+@router.post(
+    "/api-keys/revoke",
+    response_model=ApiKeyResponse,
+    summary="Revoke API Key",
+    description="Changes the API key status to revoked when the provided user owns the key.",
+)
+def revoke_api_key(request: RevokeApiKeyRequest, current_user=Depends(get_current_user)):
+    try:
+        api_key = revoke_api_key_service(str(request.api_key_id), current_user["id"])
+        return ApiKeyResponse(**api_key)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to revoke API key: {exc}") from exc

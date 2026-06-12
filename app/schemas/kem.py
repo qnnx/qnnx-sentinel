@@ -1,26 +1,21 @@
 from pydantic import BaseModel
 
-# REQUESTS
-class KeyGenRequest(BaseModel):
-    algorithm: str
-
 class EncapsulationRequest(BaseModel):
     algorithm: str
-    public_key: str  # Hex-encoded string
+    public_key: str
 
 class DecapsulationRequest(BaseModel):
     algorithm: str
-    ciphertext: str  # Hex-encoded string
-    private_key: str # Hex-encoded string
-
-# RESPONSES
-class KeyGenResponse(BaseModel):
-    public_key: str  # Hex-encoded string
-    private_key: str # Hex-encoded string
+    ciphertext: str
+    private_key: str
 
 class EncapsulationResponse(BaseModel):
-    ciphertext: str    # Hex-encoded string
-    shared_secret: str # Hex-encoded string
+    algorithm: str
+    ciphertext: str
+    shared_secret: str
+    status: str
 
 class DecapsulationResponse(BaseModel):
-    shared_secret: str # Hex-encoded string
+    algorithm: str
+    shared_secret: str
+    status: str
