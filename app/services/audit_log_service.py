@@ -64,13 +64,15 @@ def create_audit_log(
                 "details": _normalize_details(details),
             },
         )
+        db.commit() # Ensure the commit is explicit!
         return _serialize_audit_log(log)
     except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to create audit log") from exc
+        # CRITICAL: Print the real error to the terminal
+        print(f"!!! AUDIT LOG DATABASE ERROR: {repr(exc)}") 
+        raise HTTPException(status_code=500, detail=f"Audit log failed: {str(exc)}")
     finally:
         db.close()
-
 
 def get_user_audit_logs(user_id: str) -> list[dict]:
     if not user_id:

@@ -43,8 +43,8 @@ def create_api_key(request: CreateApiKeyRequest, current_user=Depends(get_curren
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to create API key: {exc}") from exc
-
+        # We are forcing the real error to the surface!
+        raise HTTPException(status_code=500, detail=f"CRASH REPORT: {repr(exc)}") from exc
 
 @router.post(
     "/api-keys/revoke",

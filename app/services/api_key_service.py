@@ -1,4 +1,4 @@
-from uuid import uuid4
+from uuid import uuid4, UUID
 
 from fastapi import HTTPException
 from sqlalchemy.exc import SQLAlchemyError
@@ -8,7 +8,7 @@ from app.models.api_key import ApiKey
 from app.repositories.api_key_repo import APIKeyRepository
 from app.services.audit_log_service import create_audit_log
 from app.utils.crypto import generate_token, sha256_hex
-
+from datetime import datetime, timezone
 api_key_repository = APIKeyRepository()
 
 
@@ -42,19 +42,22 @@ def create_api_key(user_id: str, name: str) -> dict:
     signing_secret = _generate_signing_secret()
     key_hash = sha256_hex(raw_api_key)
     signing_secret_hash = sha256_hex(signing_secret)
-
+    sanitized_user_id = str(user_id) 
+    
+    db = SessionLocal()
     db = SessionLocal()
     try:
         api_key = api_key_repository.create(
             db,
             {
                 "id": uuid4(),
-                "user_id": user_id,
+                "user_id": UUID(sanitized_user_id),
                 "key_prefix": raw_api_key[:12],
                 "name": name.strip(),
                 "key_hash": key_hash,
                 "signing_secret_hash": signing_secret_hash,
                 "status": "active",
+                "created_at": datetime.now(timezone.utc),
             },
         )
         response = _serialize_api_key(api_key)
@@ -77,7 +80,8 @@ def create_api_key(user_id: str, name: str) -> dict:
         return response
     except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to create API key") from exc
+        # FIX: We bypass the generic error and inject the real SQL trace!
+        raise HTTPException(status_code=500, detail=f"REAL DB ERROR: {repr(exc)}") from exc
     finally:
         db.close()
 

@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from app.models.api_usage import ApiUsage
-
+from datetime import datetime, timezone
+import uuid
 
 class ApiUsageRepository:
 
@@ -23,11 +24,24 @@ class ApiUsageRepository:
         )
 
     def create(self, db: Session, usage_data: dict):
-        usage = ApiUsage(**usage_data)
-        db.add(usage)
-        db.commit()
-        db.refresh(usage)
-        return usage
+    # Ensure ID exists
+        if "id" not in usage_data or not usage_data["id"]:
+            usage_data["id"] = str(uuid.uuid4())
+        
+    # THE FIX: Ensure created_at exists
+        if not usage_data.get("created_at"):
+            usage_data["created_at"] = datetime.now(timezone.utc)
+        
+        try:
+        # Note: If your model is named differently (like UsageLog), change ApiUsage below to match your import
+            usage = ApiUsage(**usage_data) 
+            db.add(usage)
+            db.commit()
+            db.refresh(usage)
+            return usage
+        except Exception as e:
+            db.rollback()
+        raise e
 
     def update(self, db: Session, usage_id: str, update_data: dict):
         usage = self.get_by_id(db, usage_id)

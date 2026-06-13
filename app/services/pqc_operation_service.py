@@ -49,6 +49,8 @@ def _record_operation(
     resource_id: str | None = None,
     error_type: str | None = None,
 ):
+    import traceback # ADD THIS
+
     try:
         create_audit_log(
             action=audit_action,
@@ -60,8 +62,9 @@ def _record_operation(
             resource_id=resource_id,
             details=details,
         )
-    except HTTPException:
-        pass
+    except Exception as e: # CHANGED THIS TO CATCH EVERYTHING
+        print(f"\n!!! CRITICAL AUDIT LOG FAILURE: {e}")
+        traceback.print_exc()
 
     try:
         record_api_usage(
@@ -78,9 +81,9 @@ def _record_operation(
             user_agent=user_agent,
             error_type=error_type,
         )
-    except HTTPException:
-        pass
-
+    except Exception as e: # CHANGED THIS TO CATCH EVERYTHING
+        print(f"\n!!! CRITICAL USAGE LOG FAILURE: {e}")
+        traceback.print_exc()
 
 def _record_failure(
     *,
@@ -166,6 +169,7 @@ def generate_and_store_keypair(
 
         db = SessionLocal()
         try:
+            from datetime import datetime, timezone
             key = key_repository.create(
                 db,
                 {
@@ -178,6 +182,7 @@ def generate_and_store_keypair(
                     "private_key_ref": None,
                     "storage_mode": storage_mode,
                     "private_key_exported": True,
+                    "created_at": datetime.now(timezone.utc),
                 },
             )
         finally:
@@ -271,6 +276,8 @@ def generate_and_store_keypair(
                 "api_key_id": str(api_key_context.id),
             },
         )
+        print(f"\n!!! REAL DATABASE ERROR: {exc}") 
+        import traceback; traceback.print_exc()
         raise HTTPException(status_code=500, detail="Failed to store key metadata") from exc
 
 

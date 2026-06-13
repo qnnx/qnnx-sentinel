@@ -20,10 +20,7 @@ class ApiSecurityEvent(Base):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
-    user_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("auth.users.id", ondelete="SET NULL"),
-    )
+    user_id = Column(UUID(as_uuid=True))
     api_key_id = Column(
         UUID(as_uuid=True),
         ForeignKey("public.api_keys.id", ondelete="SET NULL"),
