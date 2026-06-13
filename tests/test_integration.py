@@ -14,22 +14,7 @@ from app.models.audit_log import AuditLog
 from app.models.api_usage import ApiUsage
 from app.security.request_signature import create_request_signature
 from app.services.pqc_operation_service import SessionLocal
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
-from starlette.exceptions import HTTPException as StarletteHTTPException
-from app.main import app  # Ensures we are overriding the main app's handlers
 
-# 1. Catch and print hidden Pydantic Schema Errors
-@app.exception_handler(RequestValidationError)
-async def override_validation_error(request, exc):
-    print(f"\n!!! PYDANTIC ERROR REVEALED: {exc.errors()} !!!")
-    return JSONResponse(status_code=400, content={"error": "Revealed", "details": exc.errors()})
-
-# 2. Catch and print hidden Backend/Dependency 400 Errors
-@app.exception_handler(StarletteHTTPException)
-async def override_http_error(request, exc):
-    print(f"\n!!! HTTP ERROR REVEALED: {exc.detail} !!!")
-    return JSONResponse(status_code=exc.status_code, content={"error": "Revealed", "details": exc.detail})
 API_PREFIX = "/api/v1" 
 
 # =====================================================================
@@ -38,8 +23,8 @@ API_PREFIX = "/api/v1"
 
 # Hardcode your credentials from Supabase
 test_state = {
-    "api_key_id": "184acd71-c4ff-420c-bd16-c19148ffd6db", # The UUID from SQL
-    "api_key": "qnnx_somiltestkey123",
+    "api_key_id": "API_KEY_ID", # The UUID from SQL
+    "api_key": "API_KEY",
     "signing_secret": "ignored",
     "public_key": None # Will be populated by the keygen test
 }
