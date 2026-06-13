@@ -5,7 +5,7 @@ class AlgorithmInfo(BaseModel):
     algo_id: str
     name: str
     type: str
-    security_level: int
+    security_level: str
     standard: str
     description: Optional[str] = None
     status: Optional[str] = None

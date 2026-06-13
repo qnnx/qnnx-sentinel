@@ -14,7 +14,22 @@ from app.models.audit_log import AuditLog
 from app.models.api_usage import ApiUsage
 from app.security.request_signature import create_request_signature
 from app.services.pqc_operation_service import SessionLocal
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from app.main import app  # Ensures we are overriding the main app's handlers
 
+# 1. Catch and print hidden Pydantic Schema Errors
+@app.exception_handler(RequestValidationError)
+async def override_validation_error(request, exc):
+    print(f"\n!!! PYDANTIC ERROR REVEALED: {exc.errors()} !!!")
+    return JSONResponse(status_code=400, content={"error": "Revealed", "details": exc.errors()})
+
+# 2. Catch and print hidden Backend/Dependency 400 Errors
+@app.exception_handler(StarletteHTTPException)
+async def override_http_error(request, exc):
+    print(f"\n!!! HTTP ERROR REVEALED: {exc.detail} !!!")
+    return JSONResponse(status_code=exc.status_code, content={"error": "Revealed", "details": exc.detail})
 API_PREFIX = "/api/v1" 
 
 # =====================================================================
@@ -169,15 +184,15 @@ def test_dsa_sign_and_verify_flow(client: TestClient):
     message_b64 = base64.b64encode(message.encode()).decode()
 
     # Generate DSA Keys
-    keygen_res = client.post(f"{API_PREFIX}/keygen", json={"algorithm": "ML-DSA-65", "key_type": "dsa"}, headers=headers)
-    assert keygen_res.status_code == 200
+    keygen_res = client.post(f"{API_PREFIX}/keygen", json={"algorithm": "ml-dsa-65", "key_type": "dsa"}, headers=headers)
+    assert keygen_res.status_code == 200, f"Keygen failed: {keygen_res.text}"
     keys = keygen_res.json()
 
     # Sign the message
     sign_res = client.post(
         f"{API_PREFIX}/sign",
         json={
-            "algorithm": "ML-DSA-65", 
+            "algorithm": "ml-dsa-65", 
             "private_key": keys["private_key"],
             "message": message_b64
         },
@@ -190,7 +205,7 @@ def test_dsa_sign_and_verify_flow(client: TestClient):
     verify_res = client.post(
         f"{API_PREFIX}/verify",
         json={
-            "algorithm": "ML-DSA-65", 
+            "algorithm": "ml-dsa-65", 
             "public_key": keys["public_key"],
             "message": message_b64,
             "signature": signature
@@ -199,7 +214,6 @@ def test_dsa_sign_and_verify_flow(client: TestClient):
     )
 
     assert verify_res.status_code == 200
-    print(f"\n!!! VERIFY RESPONSE: {verify_res.json()}")
     assert verify_res.json()["is_valid"] is True, "Valid signature was incorrectly rejected!"
 
     # Tamper with the message and verify it fails
@@ -209,7 +223,7 @@ def test_dsa_sign_and_verify_flow(client: TestClient):
     tamper_res = client.post(
         f"{API_PREFIX}/verify",
         json={
-            "algorithm": "ML-DSA-65", 
+            "algorithm": "ml-dsa-65", 
             "public_key": keys["public_key"],
             "message": tampered_b64,
             "signature": signature

@@ -23,7 +23,7 @@ from app.services.audit_log_service import create_audit_log
 from app.utils.crypto import sha256_hex
 
 REQUEST_TTL_SECONDS = 300
-ACTIVE_ALGORITHM_STATUSES = {"active", "enabled"}
+ACTIVE_ALGORITHM_STATUSES = {"active", "enabled","recommended"}
 
 api_key_repository = APIKeyRepository()
 api_nonce_repository = APINonceRepository()
@@ -139,6 +139,7 @@ def _create_security_event(
 
 def _validate_algorithm(db, request: Request, payload: dict[str, Any], api_key_context: ApiKeyContext):
     algorithm = extract_algorithm(payload)
+    
     if not algorithm:
         raise HTTPException(status_code=400, detail="algorithm is required")
 

@@ -18,6 +18,7 @@ def generate_keys(
     http_request: Request,
     api_key_context: ApiKeyContext = Depends(verify_signed_request),
 ):
+    print(f"\n[DEBUG] Incoming Keygen Request for: {request.algorithm}")
     try:
         return KeyGenResponse(
             **generate_and_store_keypair(

@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 class KeyGenRequest(BaseModel):
     algorithm: str
+    key_type: str
     storage_mode: Literal["customer_managed", "sentinel_managed"] = "customer_managed"
 
 
