@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 # NEW: Import our settings and limiter
@@ -10,6 +12,7 @@ from app.schemas.keygen import KeyGenRequest, KeyGenResponse
 from app.services.pqc_operation_service import generate_and_store_keypair
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.post(
     "/keygen",
@@ -38,4 +41,5 @@ def generate_keys(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Key generation failed: {exc}") from exc
+        logger.exception("Key generation failed")
+        raise HTTPException(status_code=500, detail="Key generation failed") from exc

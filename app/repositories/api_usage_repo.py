@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from app.models.api_usage import ApiUsage
+from app.repositories._types import as_uuid, normalize_uuid_fields
 
 
 class ApiUsageRepository:
@@ -8,22 +9,24 @@ class ApiUsageRepository:
         return db.query(ApiUsage).all()
 
     def get_by_id(self, db: Session, usage_id: str):
-        return db.query(ApiUsage).filter(ApiUsage.id == usage_id).first()
+        return db.query(ApiUsage).filter(ApiUsage.id == as_uuid(usage_id)).first()
 
     def get_by_user_id(self, db: Session, user_id: str):
-        return db.query(ApiUsage).filter(ApiUsage.user_id == user_id).all()
+        return db.query(ApiUsage).filter(ApiUsage.user_id == as_uuid(user_id)).all()
 
     def get_recent_by_user_id(self, db: Session, user_id: str, limit: int = 10):
         return (
             db.query(ApiUsage)
-            .filter(ApiUsage.user_id == user_id)
+            .filter(ApiUsage.user_id == as_uuid(user_id))
             .order_by(ApiUsage.created_at.desc())
             .limit(limit)
             .all()
         )
 
     def create(self, db: Session, usage_data: dict):
-        usage = ApiUsage(**usage_data)
+        usage = ApiUsage(
+            **normalize_uuid_fields(usage_data, "id", "user_id", "api_key_id")
+        )
         db.add(usage)
         db.commit()
         db.refresh(usage)

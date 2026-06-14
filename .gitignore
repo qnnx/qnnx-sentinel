@@ -7,11 +7,10 @@ __pycache__/
 *.pyc
 test_connection.py
 zota.py
-.env
 QNNX_Sentinel/
 report.md
 scripts/
 test.json
 test_repo.py
-mitm_test.py
-mitm_test2.py
+*.env
+*.ini

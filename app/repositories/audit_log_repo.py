@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.models.audit_log import AuditLog
+from app.repositories._types import as_uuid, normalize_uuid_fields
 
 
 class AuditLogRepository:
@@ -8,16 +9,18 @@ class AuditLogRepository:
         return db.query(AuditLog).all()
 
     def get_by_id(self, db: Session, log_id: str):
-        return db.query(AuditLog).filter(AuditLog.id == log_id).first()
+        return db.query(AuditLog).filter(AuditLog.id == as_uuid(log_id)).first()
 
     def get_by_user_id(self, db: Session, user_id: str):
-        return db.query(AuditLog).filter(AuditLog.user_id == user_id).all()
+        return db.query(AuditLog).filter(AuditLog.user_id == as_uuid(user_id)).all()
 
     def get_by_action(self, db: Session, action: str):
         return db.query(AuditLog).filter(AuditLog.event_type == action).all()
 
     def create(self, db: Session, log_data: dict):
-        log = AuditLog(**log_data)
+        log = AuditLog(
+            **normalize_uuid_fields(log_data, "id", "user_id", "api_key_id")
+        )
         db.add(log)
         db.commit()
         db.refresh(log)

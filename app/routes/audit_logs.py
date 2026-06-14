@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -7,6 +8,7 @@ from app.schemas.audit_logs import AuditLogResponse
 from app.services.audit_log_service import get_audit_log_by_id, get_user_audit_logs
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.get(
     "/audit-logs",
@@ -21,7 +23,8 @@ def get_audit_logs(current_user=Depends(get_current_user)):
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch audit logs: {exc}") from exc
+        logger.exception("Failed to fetch audit logs")
+        raise HTTPException(status_code=500, detail="Failed to fetch audit logs") from exc
 
 
 @router.get(
@@ -37,4 +40,5 @@ def get_audit_log(log_id: UUID, current_user=Depends(get_current_user)):
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch audit log: {exc}") from exc
+        logger.exception("Failed to fetch audit log")
+        raise HTTPException(status_code=500, detail="Failed to fetch audit log") from exc

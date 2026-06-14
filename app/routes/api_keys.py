@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.dependencies import get_current_user
@@ -14,6 +16,7 @@ from app.services.api_key_service import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.get(
     "/api-keys",
@@ -28,7 +31,8 @@ def get_api_keys(current_user=Depends(get_current_user)):
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch API keys: {exc}") from exc
+        logger.exception("Failed to fetch API keys")
+        raise HTTPException(status_code=500, detail="Failed to fetch API keys") from exc
 
 @router.post(
     "/api-keys",
@@ -43,7 +47,8 @@ def create_api_key(request: CreateApiKeyRequest, current_user=Depends(get_curren
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to create API key: {exc}") from exc
+        logger.exception("Failed to create API key")
+        raise HTTPException(status_code=500, detail="Failed to create API key") from exc
 
 
 @router.post(
@@ -59,4 +64,5 @@ def revoke_api_key(request: RevokeApiKeyRequest, current_user=Depends(get_curren
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to revoke API key: {exc}") from exc
+        logger.exception("Failed to revoke API key")
+        raise HTTPException(status_code=500, detail="Failed to revoke API key") from exc

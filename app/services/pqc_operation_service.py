@@ -1,5 +1,6 @@
 import base64
 import binascii
+import logging
 import time
 from uuid import uuid4
 
@@ -16,6 +17,7 @@ from app.services.audit_log_service import create_audit_log
 
 algorithm_repository = AlgorithmRepository()
 key_repository = KeyRepository()
+logger = logging.getLogger(__name__)
 
 
 def _decode_base64(value: str, field_name: str) -> bytes:
@@ -60,8 +62,8 @@ def _record_operation(
             resource_id=resource_id,
             details=details,
         )
-    except HTTPException:
-        pass
+    except Exception:
+        logger.exception("Failed to write audit log for %s", operation)
 
     try:
         record_api_usage(
@@ -78,8 +80,8 @@ def _record_operation(
             user_agent=user_agent,
             error_type=error_type,
         )
-    except HTTPException:
-        pass
+    except Exception:
+        logger.exception("Failed to write API usage for %s", operation)
 
 
 def _record_failure(
@@ -132,13 +134,13 @@ def _resolve_algorithm_record(algorithm: str):
         db.close()
 
 
-def _detect_key_type(algorithm_name: str) -> str:
-    normalized = algorithm_name.casefold()
-    if "kem" in normalized:
+def _detect_key_type(algorithm_type: str) -> str:
+    normalized = algorithm_type.casefold()
+    if normalized in {"kem", "key encapsulation"}:
         return "kem"
-    if "dsa" in normalized:
+    if normalized in {"signature", "sig", "dsa"}:
         return "signature"
-    raise HTTPException(status_code=400, detail=f"Unsupported algorithm family: {algorithm_name}")
+    raise HTTPException(status_code=400, detail=f"Unsupported algorithm family: {algorithm_type}")
 
 
 def generate_and_store_keypair(
@@ -154,7 +156,7 @@ def generate_and_store_keypair(
     start = time.perf_counter()
     try:
         algorithm_record = _resolve_algorithm_record(algorithm)
-        key_type = _detect_key_type(algorithm_record.name)
+        key_type = _detect_key_type(algorithm_record.type)
 
         if storage_mode == "sentinel_managed":
             raise HTTPException(status_code=501, detail="sentinel_managed storage not implemented yet")

@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 # NEW: Import our settings and limiter
@@ -15,6 +17,7 @@ from app.schemas.kem import (
 from app.services.pqc_operation_service import run_kem_decapsulation, run_kem_encapsulation
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.post(
     "/kem/encapsulate",
@@ -43,7 +46,8 @@ def kem_encapsulate(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"KEM encapsulation failed: {exc}") from exc
+        logger.exception("KEM encapsulation failed")
+        raise HTTPException(status_code=500, detail="KEM encapsulation failed") from exc
 
 @router.post(
     "/kem/decapsulate",
@@ -73,4 +77,5 @@ def kem_decapsulate(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"KEM decapsulation failed: {exc}") from exc
+        logger.exception("KEM decapsulation failed")
+        raise HTTPException(status_code=500, detail="KEM decapsulation failed") from exc

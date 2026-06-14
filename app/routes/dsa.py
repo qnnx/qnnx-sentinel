@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 # NEW: Import our settings and limiter
@@ -15,6 +17,7 @@ from app.schemas.dsa import (
 from app.services.pqc_operation_service import run_sign_operation, run_verify_operation
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.post(
     "/sign",
@@ -44,7 +47,8 @@ def sign_message(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Signing failed: {exc}") from exc
+        logger.exception("Signing failed")
+        raise HTTPException(status_code=500, detail="Signing failed") from exc
 
 @router.post(
     "/verify",
@@ -75,4 +79,5 @@ def verify_signature(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Verification failed: {exc}") from exc
+        logger.exception("Verification failed")
+        raise HTTPException(status_code=500, detail="Verification failed") from exc

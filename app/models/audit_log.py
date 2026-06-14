@@ -1,4 +1,6 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Index, Text
+import uuid
+
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.sql import func
 
@@ -14,7 +16,12 @@ class AuditLog(Base):
         {"schema": "audit"},
     )
 
-    id = Column(UUID(as_uuid=True), primary_key=True)
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
 
     event_type = Column(Text, nullable=False)
     resource_type = Column(Text)
@@ -29,5 +36,7 @@ class AuditLog(Base):
 
     created_at = Column(
         DateTime(timezone=True),
-        server_default=func.now()
+        nullable=False,
+        server_default=func.now(),
     )
+import uuid

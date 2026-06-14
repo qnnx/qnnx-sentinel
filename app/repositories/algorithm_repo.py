@@ -1,6 +1,7 @@
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.models.algorithm import Algorithm
+from app.repositories._types import as_uuid
 
 class AlgorithmRepository:
 
@@ -8,7 +9,7 @@ class AlgorithmRepository:
         return db.query(Algorithm).all()
 
     def get_by_id(self, db: Session, algorithm_id: str):
-        return db.query(Algorithm).filter(Algorithm.id == algorithm_id).first()
+        return db.query(Algorithm).filter(Algorithm.id == as_uuid(algorithm_id)).first()
 
     def get_by_algo_id(self, db: Session, algo_id: str):
         return db.query(Algorithm).filter(Algorithm.algo_id == algo_id).first()

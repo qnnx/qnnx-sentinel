@@ -1,3 +1,5 @@
+import logging
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
@@ -20,10 +22,12 @@ from app.security.request_signature import (
     verify_request_signature,
 )
 from app.services.audit_log_service import create_audit_log
+from app.services.algorithm_support import is_algorithm_executable
 from app.utils.crypto import sha256_hex
 
 REQUEST_TTL_SECONDS = 300
 ACTIVE_ALGORITHM_STATUSES = {"active", "enabled", "recommended"}
+logger = logging.getLogger(__name__)
 
 api_key_repository = APIKeyRepository()
 api_nonce_repository = APINonceRepository()
@@ -118,6 +122,7 @@ def _create_security_event(
         )
     except SQLAlchemyError:
         db.rollback()
+        logger.exception("Failed to create API security event")
 
     try:
         create_audit_log(
@@ -133,8 +138,8 @@ def _create_security_event(
                 **(details or {}),
             },
         )
-    except HTTPException:
-        pass
+    except Exception:
+        logger.exception("Failed to create audit log for security event")
 
 
 def _validate_algorithm(db, request: Request, payload: dict[str, Any], api_key_context: ApiKeyContext):
@@ -143,7 +148,11 @@ def _validate_algorithm(db, request: Request, payload: dict[str, Any], api_key_c
         raise HTTPException(status_code=400, detail="algorithm is required")
 
     record = algorithm_repository.get_by_identifier(db, algorithm)
-    if not record or (record.status or "").lower() not in ACTIVE_ALGORITHM_STATUSES:
+    if (
+        not record
+        or (record.status or "").lower() not in ACTIVE_ALGORITHM_STATUSES
+        or not is_algorithm_executable(record.name, record.type)
+    ):
         _create_security_event(
             db,
             request,
@@ -275,6 +284,9 @@ async def verify_signed_request(request: Request):
         _validate_algorithm(db, request, payload or {}, api_key_context)
 
         if not settings.DISABLE_SIGNED_REQUEST_GUARDS:
+            cutoff = datetime.now(timezone.utc) - timedelta(seconds=REQUEST_TTL_SECONDS)
+            api_nonce_repository.delete_created_before(db, cutoff)
+
             if api_nonce_repository.get_by_key_and_nonce(db, str(api_key_context.id), nonce):
                 _create_security_event(
                     db,
@@ -305,11 +317,14 @@ async def verify_signed_request(request: Request):
                     api_key_id=api_key_context.id,
                 )
                 raise HTTPException(status_code=401, detail="Replay attack detected") from exc
+
+        api_key_repository.mark_used(db, str(api_key_context.id))
     except HTTPException:
         raise
     except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to validate signed request: {exc}") from exc
+        logger.exception("Failed to validate signed request")
+        raise HTTPException(status_code=500, detail="Failed to validate signed request") from exc
     finally:
         db.close()
 

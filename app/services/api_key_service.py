@@ -1,3 +1,4 @@
+import logging
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -10,6 +11,7 @@ from app.services.audit_log_service import create_audit_log
 from app.utils.crypto import generate_token, sha256_hex
 
 api_key_repository = APIKeyRepository()
+logger = logging.getLogger(__name__)
 
 
 def _generate_raw_api_key() -> str:
@@ -72,8 +74,8 @@ def create_api_key(user_id: str, name: str) -> dict:
                     "name": api_key.name,
                 },
             )
-        except HTTPException:
-            pass
+        except Exception:
+            logger.exception("Failed to write API key creation audit log")
         return response
     except SQLAlchemyError as exc:
         db.rollback()
@@ -126,8 +128,8 @@ def revoke_api_key(api_key_id: str, user_id: str) -> dict:
                     "name": api_key.name,
                 },
             )
-        except HTTPException:
-            pass
+        except Exception:
+            logger.exception("Failed to write API key revocation audit log")
         return _serialize_api_key(api_key)
     except SQLAlchemyError as exc:
         db.rollback()

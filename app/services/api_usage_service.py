@@ -86,7 +86,7 @@ def get_user_usage_summary(user_id: str) -> dict:
     try:
         usage_records = api_usage_repository.get_by_user_id(db, user_id)
         total_requests = len(usage_records)
-        successful_requests = sum(1 for item in usage_records if 200 <= item.response_status < 400)
+        successful_requests = sum(1 for item in usage_records if item.success)
         failed_requests = total_requests - successful_requests
         success_rate = round((successful_requests / total_requests) * 100, 2) if total_requests else 0.0
 

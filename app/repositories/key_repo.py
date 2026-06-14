@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from app.models.key import Key
+from app.repositories._types import as_uuid, normalize_uuid_fields
 
 class KeyRepository:
 
@@ -7,10 +8,12 @@ class KeyRepository:
         return db.query(Key).all()
 
     def get_by_id(self, db: Session, key_id: str):
-        return db.query(Key).filter(Key.id == key_id).first()
+        return db.query(Key).filter(Key.id == as_uuid(key_id)).first()
 
     def create(self, db: Session, key_data: dict):
-        key = Key(**key_data)
+        key = Key(
+            **normalize_uuid_fields(key_data, "id", "user_id", "algorithm_id")
+        )
         db.add(key)
         db.commit()
         db.refresh(key)

@@ -46,4 +46,3 @@ def generate_keypair(algorithm: str) -> dict:
         "private_key": _b64encode(raw_response["private_key"]),
         "status": "created",
     }
-

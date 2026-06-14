@@ -1,6 +1,8 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env")
+
     PROJECT_NAME: str = "QNNX-Sentinel"
     VERSION: str = "1.0.0"
     DESCRIPTION: str = "Post-Quantum Cryptography API for QNNX-Sentinel"
@@ -12,8 +14,5 @@ class Settings(BaseSettings):
     KEM_RATE_LIMIT: str = "100/minute"
     SIGN_RATE_LIMIT: str = "60/minute"
     VERIFY_RATE_LIMIT: str = "120/minute"
-
-    class Config:
-        env_file = ".env"
 
 settings = Settings()

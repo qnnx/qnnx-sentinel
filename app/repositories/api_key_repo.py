@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models.api_key import ApiKey
+from app.repositories._types import as_uuid, normalize_uuid_fields
 
 
 class APIKeyRepository:
@@ -11,16 +12,21 @@ class APIKeyRepository:
         return db.query(ApiKey).all()
 
     def get_by_id(self, db: Session, api_key_id: str):
-        return db.query(ApiKey).filter(ApiKey.id == api_key_id).first()
+        return db.query(ApiKey).filter(ApiKey.id == as_uuid(api_key_id)).first()
 
     def get_by_hash(self, db: Session, key_hash: str):
         return db.query(ApiKey).filter(ApiKey.key_hash == key_hash).first()
 
     def get_by_user_id(self, db: Session, user_id: str):
-        return db.query(ApiKey).filter(ApiKey.user_id == user_id).order_by(ApiKey.created_at.desc()).all()
+        return (
+            db.query(ApiKey)
+            .filter(ApiKey.user_id == as_uuid(user_id))
+            .order_by(ApiKey.created_at.desc())
+            .all()
+        )
 
     def create(self, db: Session, api_key_data: dict):
-        api_key = ApiKey(**api_key_data)
+        api_key = ApiKey(**normalize_uuid_fields(api_key_data, "id", "user_id"))
         db.add(api_key)
         db.commit()
         db.refresh(api_key)
@@ -47,6 +53,13 @@ class APIKeyRepository:
                 "status": "revoked",
                 "revoked_at": datetime.now(timezone.utc),
             },
+        )
+
+    def mark_used(self, db: Session, api_key_id: str):
+        return self.update(
+            db,
+            api_key_id,
+            {"last_used_at": datetime.now(timezone.utc)},
         )
 
     def delete(self, db: Session, api_key_id: str):
