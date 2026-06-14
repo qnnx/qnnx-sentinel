@@ -17,6 +17,8 @@ def error_response(success: bool, status_code: int, error: str):
     )
 
 async def bad_request_handler(request: Request, exc: Exception):
+    if isinstance(exc, HTTPException) and isinstance(exc.detail, str):
+        return error_response(False, 400, exc.detail)
     return error_response(False, 400, "Bad Request")
 
 async def unauthorized_handler(request: Request, exc: Exception):
