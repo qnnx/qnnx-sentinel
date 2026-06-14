@@ -50,7 +50,9 @@ def _record_operation(
     resource_type: str | None = None,
     resource_id: str | None = None,
     error_type: str | None = None,
-):
+) -> bool:
+    audit_logged = False
+    usage_logged = False
     try:
         create_audit_log(
             action=audit_action,
@@ -62,8 +64,19 @@ def _record_operation(
             resource_id=resource_id,
             details=details,
         )
+        audit_logged = True
     except Exception:
-        logger.exception("Failed to write audit log for %s", operation)
+        logger.critical(
+            "SECURITY AUDIT WRITE FAILED operation=%s action=%s status=%s "
+            "algorithm=%s endpoint=%s api_key_id=%s",
+            operation,
+            audit_action,
+            audit_status,
+            algorithm,
+            endpoint,
+            api_key_id or str(api_key_context.id),
+            exc_info=True,
+        )
 
     try:
         record_api_usage(
@@ -80,8 +93,30 @@ def _record_operation(
             user_agent=user_agent,
             error_type=error_type,
         )
+        usage_logged = True
     except Exception:
-        logger.exception("Failed to write API usage for %s", operation)
+        logger.error(
+            "API USAGE WRITE FAILED operation=%s success=%s status=%s "
+            "algorithm=%s endpoint=%s api_key_id=%s",
+            operation,
+            success,
+            response_status,
+            algorithm,
+            endpoint,
+            str(api_key_context.id),
+            exc_info=True,
+        )
+
+    if not audit_logged or not usage_logged:
+        logger.error(
+            "Operation logging incomplete operation=%s audit_logged=%s "
+            "usage_logged=%s success=%s",
+            operation,
+            audit_logged,
+            usage_logged,
+            success,
+        )
+    return audit_logged and usage_logged
 
 
 def _record_failure(
@@ -101,8 +136,8 @@ def _record_failure(
     user_agent: str | None = None,
     resource_type: str | None = None,
     resource_id: str | None = None,
-):
-    _record_operation(
+) -> bool:
+    return _record_operation(
         api_key_context=api_key_context,
         endpoint=endpoint,
         method=method,
@@ -274,6 +309,32 @@ def generate_and_store_keypair(
             },
         )
         raise HTTPException(status_code=500, detail="Failed to store key metadata") from exc
+    except Exception as exc:
+        elapsed_ms = int((time.perf_counter() - start) * 1000)
+        _record_failure(
+            api_key_context=api_key_context,
+            endpoint=endpoint,
+            method=method,
+            operation="keygen",
+            algorithm=algorithm,
+            response_status=500,
+            response_time_ms=elapsed_ms,
+            audit_action="KEY_GENERATION_FAILED",
+            ip_address=ip_address,
+            user_agent=user_agent,
+            resource_type="key",
+            error_type=type(exc).__name__,
+            details={
+                "algorithm": algorithm,
+                "operation": "keygen",
+                "storage_mode": storage_mode,
+                "endpoint": endpoint,
+                "status": "failed",
+                "api_key_id": str(api_key_context.id),
+            },
+        )
+        logger.exception("PQC key generation failed for algorithm=%s", algorithm)
+        raise HTTPException(status_code=500, detail="Key generation failed") from exc
 
 
 def run_kem_encapsulation(
@@ -346,6 +407,32 @@ def run_kem_encapsulation(
             },
         )
         raise
+    except Exception as exc:
+        elapsed_ms = int((time.perf_counter() - start) * 1000)
+        _record_failure(
+            api_key_context=api_key_context,
+            endpoint=endpoint,
+            method=method,
+            operation="kem_encapsulate",
+            algorithm=algorithm,
+            response_status=500,
+            response_time_ms=elapsed_ms,
+            audit_action="KEM_ENCAPSULATION_FAILED",
+            ip_address=ip_address,
+            user_agent=user_agent,
+            resource_type="kem_operation",
+            error_type=type(exc).__name__,
+            details={
+                "algorithm": algorithm,
+                "operation": "kem_encapsulate",
+                "key_type": "kem",
+                "endpoint": endpoint,
+                "status": "failed",
+                "api_key_id": str(api_key_context.id),
+            },
+        )
+        logger.exception("KEM encapsulation failed for algorithm=%s", algorithm)
+        raise HTTPException(status_code=500, detail="KEM encapsulation failed") from exc
 
 
 def run_kem_decapsulation(
@@ -419,6 +506,32 @@ def run_kem_decapsulation(
             },
         )
         raise
+    except Exception as exc:
+        elapsed_ms = int((time.perf_counter() - start) * 1000)
+        _record_failure(
+            api_key_context=api_key_context,
+            endpoint=endpoint,
+            method=method,
+            operation="kem_decapsulate",
+            algorithm=algorithm,
+            response_status=500,
+            response_time_ms=elapsed_ms,
+            audit_action="KEM_DECAPSULATION_FAILED",
+            ip_address=ip_address,
+            user_agent=user_agent,
+            resource_type="kem_operation",
+            error_type=type(exc).__name__,
+            details={
+                "algorithm": algorithm,
+                "operation": "kem_decapsulate",
+                "key_type": "kem",
+                "endpoint": endpoint,
+                "status": "failed",
+                "api_key_id": str(api_key_context.id),
+            },
+        )
+        logger.exception("KEM decapsulation failed for algorithm=%s", algorithm)
+        raise HTTPException(status_code=500, detail="KEM decapsulation failed") from exc
 
 
 def run_sign_operation(
@@ -491,6 +604,32 @@ def run_sign_operation(
             },
         )
         raise
+    except Exception as exc:
+        elapsed_ms = int((time.perf_counter() - start) * 1000)
+        _record_failure(
+            api_key_context=api_key_context,
+            endpoint=endpoint,
+            method=method,
+            operation="sign",
+            algorithm=algorithm,
+            response_status=500,
+            response_time_ms=elapsed_ms,
+            audit_action="SIGNATURE_CREATION_FAILED",
+            ip_address=ip_address,
+            user_agent=user_agent,
+            resource_type="signature_operation",
+            error_type=type(exc).__name__,
+            details={
+                "algorithm": algorithm,
+                "operation": "sign",
+                "key_type": "signature",
+                "endpoint": endpoint,
+                "status": "failed",
+                "api_key_id": str(api_key_context.id),
+            },
+        )
+        logger.exception("Signature creation failed for algorithm=%s", algorithm)
+        raise HTTPException(status_code=500, detail="Signing failed") from exc
 
 
 def run_verify_operation(
@@ -519,7 +658,7 @@ def run_verify_operation(
         response = {
             "algorithm": result["algorithm"],
             "is_valid": is_valid,
-            "status": "success",
+            "status": "success" if is_valid else "failed",
         }
         elapsed_ms = int((time.perf_counter() - start) * 1000)
         _record_operation(
@@ -529,7 +668,7 @@ def run_verify_operation(
             operation="verify",
             algorithm=result["algorithm"],
             response_status=200,
-            success=True,
+            success=is_valid,
             response_time_ms=elapsed_ms,
             audit_action="SIGNATURE_VERIFIED" if is_valid else "SIGNATURE_VERIFICATION_FAILED",
             audit_status="success" if is_valid else "failed",
@@ -571,3 +710,29 @@ def run_verify_operation(
             },
         )
         raise
+    except Exception as exc:
+        elapsed_ms = int((time.perf_counter() - start) * 1000)
+        _record_failure(
+            api_key_context=api_key_context,
+            endpoint=endpoint,
+            method=method,
+            operation="verify",
+            algorithm=algorithm,
+            response_status=500,
+            response_time_ms=elapsed_ms,
+            audit_action="SIGNATURE_VERIFICATION_FAILED",
+            ip_address=ip_address,
+            user_agent=user_agent,
+            resource_type="signature_operation",
+            error_type=type(exc).__name__,
+            details={
+                "algorithm": algorithm,
+                "operation": "verify",
+                "key_type": "signature",
+                "endpoint": endpoint,
+                "status": "failed",
+                "api_key_id": str(api_key_context.id),
+            },
+        )
+        logger.exception("Signature verification failed for algorithm=%s", algorithm)
+        raise HTTPException(status_code=500, detail="Verification failed") from exc

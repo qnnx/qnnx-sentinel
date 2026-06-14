@@ -34,4 +34,3 @@ class ApiKey(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     last_used_at = Column(DateTime(timezone=True))
     revoked_at = Column(DateTime(timezone=True))
-import uuid

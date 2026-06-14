@@ -35,4 +35,3 @@ class ApiSecurityEvent(Base):
     user_agent = Column(Text)
     details = Column(JSONB)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-import uuid

@@ -42,4 +42,3 @@ class ApiUsage(Base):
         nullable=False,
         server_default=func.now(),
     )
-import uuid

@@ -46,4 +46,3 @@ class Key(Base):
 
     user = relationship("User", foreign_keys=[user_id])
     algorithm = relationship("Algorithm", foreign_keys=[algorithm_id])
-import uuid
