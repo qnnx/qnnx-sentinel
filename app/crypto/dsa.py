@@ -1,6 +1,7 @@
 import ctypes
 
 from app.crypto._oqs_loader import load_signature
+from app.services.algorithm_support import enabled_mechanisms
 
 class DSAManager:
     @staticmethod
@@ -9,14 +10,18 @@ class DSAManager:
         Returns a static list of core DSA algorithms.
         Bypasses the unstable liboqs-python discovery method.
         """
-        return [
-            "ML-DSA-44", 
-            "ML-DSA-65", 
+        _, enabled = enabled_mechanisms()
+        preferred = (
+            "ML-DSA-44",
+            "ML-DSA-65",
             "ML-DSA-87",
+            "Falcon-512",
+            "Falcon-1024",
             "Dilithium2",
             "Dilithium3",
-            "Dilithium5"
-        ]
+            "Dilithium5",
+        )
+        return [name for name in preferred if name.casefold() in enabled]
 
     @staticmethod
     def generate_keypair(algorithm_name):

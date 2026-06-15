@@ -1,10 +1,5 @@
 import hashlib
 import hmac
-import secrets
-
-
-def generate_token(length: int = 32) -> str:
-    return secrets.token_urlsafe(length)
 
 
 def sha256_hex(value: str) -> str:

@@ -1,3 +1,5 @@
+import uuid
+
 from sqlalchemy import Column, DateTime, ForeignKey, Index, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.sql import func
@@ -18,9 +20,13 @@ class ApiSecurityEvent(Base):
     id = Column(
         UUID(as_uuid=True),
         primary_key=True,
+        default=uuid.uuid4,
         server_default=text("gen_random_uuid()"),
     )
-    user_id = Column(UUID(as_uuid=True))
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("public.users.id", ondelete="SET NULL"),
+    )
     api_key_id = Column(
         UUID(as_uuid=True),
         ForeignKey("public.api_keys.id", ondelete="SET NULL"),
@@ -31,4 +37,9 @@ class ApiSecurityEvent(Base):
     ip_address = Column(Text)
     user_agent = Column(Text)
     details = Column(JSONB)
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_at = Column(
+        DateTime(timezone=True), 
+        nullable=False,
+        default=func.now(), 
+        server_default=func.now()
+        )

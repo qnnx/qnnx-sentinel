@@ -1,3 +1,5 @@
+import uuid
+
 from sqlalchemy import Column, DateTime, ForeignKey, Index, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
@@ -16,6 +18,7 @@ class ApiKey(Base):
     id = Column(
         UUID(as_uuid=True),
         primary_key=True,
+        default=uuid.uuid4,
         server_default=text("gen_random_uuid()"),
     )
     user_id = Column(
@@ -23,7 +26,7 @@ class ApiKey(Base):
         ForeignKey("public.users.id", ondelete="CASCADE"),
         nullable=False,
     )
-    key_prefix = Column(Text, nullable=False)
+    key_prefix = Column(Text)
     key_hash = Column(Text, nullable=False, unique=True)
     signing_secret_hash = Column(Text, nullable=False)
     name = Column(Text, nullable=False)

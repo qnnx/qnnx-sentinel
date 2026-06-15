@@ -1,6 +1,5 @@
-import ctypes
-
 from app.crypto._oqs_loader import load_key_encapsulation
+from app.services.algorithm_support import enabled_mechanisms
 
 class KEMManager:
     @staticmethod
@@ -9,14 +8,16 @@ class KEMManager:
         Returns a static list of core KEM algorithms. 
         Bypasses the unstable liboqs-python discovery method to ensure stability.
         """
-        return [
-            "ML-KEM-512", 
-            "ML-KEM-768", 
-            "ML-KEM-1024", 
-            "Kyber512", 
-            "Kyber768", 
-            "Kyber1024"
-        ]
+        enabled, _ = enabled_mechanisms()
+        preferred = (
+            "ML-KEM-512",
+            "ML-KEM-768",
+            "ML-KEM-1024",
+            "Kyber512",
+            "Kyber768",
+            "Kyber1024",
+        )
+        return [name for name in preferred if name.casefold() in enabled]
 
     @staticmethod
     def generate_keypair(algorithm_name):

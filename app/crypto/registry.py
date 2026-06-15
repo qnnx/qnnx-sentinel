@@ -100,4 +100,3 @@ def get_algorithm_info(algo_name=None):
     normalized_name = algo_name.lower().strip()
     
     return ALGORITHM_REGISTRY.get(normalized_name, {"error": f"Algorithm '{algo_name}' not found"})
-

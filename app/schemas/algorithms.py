@@ -10,6 +10,11 @@ class AlgorithmInfo(BaseModel):
     description: Optional[str] = None
     status: Optional[str] = None
     recommended_use: Optional[str] = None
+    algo_type: Optional[str] = None
+    family: Optional[str] = None
+    public_key_size: Optional[str] = None
+    private_key_size: Optional[str] = None
+    ciphertext_size: Optional[str] = None
 
 class AlgorithmsResponse(BaseModel):
     total: int

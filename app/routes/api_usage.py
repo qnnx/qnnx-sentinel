@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.core.dependencies import get_current_user
@@ -9,6 +11,7 @@ from app.services.api_usage_service import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.get(
     "/api-usage",
@@ -23,7 +26,8 @@ def get_usage(current_user=Depends(get_current_user)):
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch API usage: {exc}") from exc
+        logger.exception("Failed to fetch API usage")
+        raise HTTPException(status_code=500, detail="Failed to fetch API usage") from exc
 
 
 @router.get(
@@ -39,7 +43,8 @@ def get_recent_usage(limit: int = Query(10, ge=1, le=100), current_user=Depends(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch recent API usage: {exc}") from exc
+        logger.exception("Failed to fetch recent API usage")
+        raise HTTPException(status_code=500, detail="Failed to fetch recent API usage") from exc
 
 
 @router.get(
@@ -55,4 +60,5 @@ def get_usage_summary(current_user=Depends(get_current_user)):
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch API usage summary: {exc}") from exc
+        logger.exception("Failed to fetch API usage summary")
+        raise HTTPException(status_code=500, detail="Failed to fetch API usage summary") from exc

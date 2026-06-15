@@ -1,3 +1,5 @@
+import uuid
+
 from sqlalchemy import Column, DateTime, ForeignKey, Index, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
@@ -17,6 +19,7 @@ class ApiNonce(Base):
     id = Column(
         UUID(as_uuid=True),
         primary_key=True,
+        default=uuid.uuid4,
         server_default=text("gen_random_uuid()"),
     )
     api_key_id = Column(

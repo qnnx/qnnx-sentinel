@@ -14,7 +14,10 @@ from app.models.audit_log import AuditLog
 from app.models.api_usage import ApiUsage
 from app.security.request_signature import create_request_signature
 from app.services.pqc_operation_service import SessionLocal
+from app.main import app
 
+# NEW: Disable the rate limiter during automated testing so Pytest doesn't trigger 429s
+app.state.limiter.enabled = False
 API_PREFIX = "/api/v1" 
 
 # =====================================================================
@@ -23,8 +26,8 @@ API_PREFIX = "/api/v1"
 
 # Hardcode your credentials from Supabase
 test_state = {
-    "api_key_id": "API_KEY_ID", # The UUID from SQL
-    "api_key": "API_KEY",
+    "api_key_id": "184acd71-c4ff-420c-bd16-c19148ffd6db", # The UUID from SQL
+    "api_key": "qnnx_somiltestkey123",
     "signing_secret": "ignored",
     "public_key": None # Will be populated by the keygen test
 }
