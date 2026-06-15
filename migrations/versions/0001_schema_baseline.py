@@ -79,7 +79,7 @@ def upgrade() -> None:
         """
         CREATE TABLE IF NOT EXISTS public.api_security_events (
             id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+            user_id uuid REFERENCES public.users(id) ON DELETE SET NULL,
             api_key_id uuid REFERENCES public.api_keys(id) ON DELETE SET NULL,
             event_type text NOT NULL,
             endpoint text,
@@ -95,7 +95,7 @@ def upgrade() -> None:
         """
         CREATE TABLE IF NOT EXISTS crypto.keys (
             id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+            user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
             algorithm_id uuid NOT NULL REFERENCES crypto.algorithms(id),
             key_type text NOT NULL,
             status text NOT NULL DEFAULT 'active',
@@ -115,7 +115,7 @@ def upgrade() -> None:
         """
         CREATE TABLE IF NOT EXISTS analytics.api_usage (
             id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+            user_id uuid REFERENCES public.users(id) ON DELETE SET NULL,
             api_key_id uuid REFERENCES public.api_keys(id) ON DELETE SET NULL,
             endpoint text NOT NULL,
             method text NOT NULL,
@@ -135,7 +135,7 @@ def upgrade() -> None:
         """
         CREATE TABLE IF NOT EXISTS audit.audit_logs (
             id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id uuid REFERENCES auth.users(id),
+            user_id uuid REFERENCES public.users(id),
             event_type text NOT NULL,
             resource_type text,
             resource_id text,

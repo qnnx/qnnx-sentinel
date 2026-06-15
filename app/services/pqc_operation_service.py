@@ -10,7 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.core.database import SessionLocal
 from app.repositories.algorithm_repo import AlgorithmRepository
 from app.repositories.key_repo import KeyRepository
-from app.schemas.api_key import ApiKeyContext
+from app.schemas.request_auth import RequestAuthContext
 from app.services import dsa_service, kem_service
 from app.services.api_usage_service import record_api_usage
 from app.services.audit_log_service import create_audit_log
@@ -33,7 +33,7 @@ def _encode_base64(value: bytes) -> str:
 
 def _record_operation(
     *,
-    api_key_context: ApiKeyContext,
+    api_key_context: RequestAuthContext,
     endpoint: str,
     method: str,
     operation: str,
@@ -57,7 +57,7 @@ def _record_operation(
         create_audit_log(
             action=audit_action,
             user_id=str(api_key_context.user_id),
-            api_key_id=api_key_id or str(api_key_context.id),
+            api_key_id=api_key_id or str(api_key_context.credential_id),
             status=audit_status,
             ip_address=ip_address,
             resource_type=resource_type,
@@ -74,14 +74,14 @@ def _record_operation(
             audit_status,
             algorithm,
             endpoint,
-            api_key_id or str(api_key_context.id),
+            api_key_id or str(api_key_context.credential_id),
             exc_info=True,
         )
 
     try:
         record_api_usage(
             user_id=str(api_key_context.user_id),
-            api_key_id=str(api_key_context.id),
+            api_key_id=str(api_key_context.credential_id),
             endpoint=endpoint,
             method=method,
             operation=operation,
@@ -103,7 +103,7 @@ def _record_operation(
             response_status,
             algorithm,
             endpoint,
-            str(api_key_context.id),
+            str(api_key_context.credential_id),
             exc_info=True,
         )
 
@@ -121,7 +121,7 @@ def _record_operation(
 
 def _record_failure(
     *,
-    api_key_context: ApiKeyContext,
+    api_key_context: RequestAuthContext,
     endpoint: str,
     method: str,
     operation: str,
@@ -180,7 +180,7 @@ def _detect_key_type(algorithm_type: str) -> str:
 
 def generate_and_store_keypair(
     *,
-    api_key_context: ApiKeyContext,
+    api_key_context: RequestAuthContext,
     algorithm: str,
     storage_mode: str,
     endpoint: str,
@@ -255,7 +255,7 @@ def generate_and_store_keypair(
                 "storage_mode": storage_mode,
                 "endpoint": endpoint,
                 "status": "success",
-                "api_key_id": str(api_key_context.id),
+                "api_key_id": str(api_key_context.credential_id),
             },
         )
         return response
@@ -280,7 +280,7 @@ def generate_and_store_keypair(
                 "storage_mode": storage_mode,
                 "endpoint": endpoint,
                 "status": "failed",
-                "api_key_id": str(api_key_context.id),
+                "api_key_id": str(api_key_context.credential_id),
             },
         )
         raise
@@ -305,7 +305,7 @@ def generate_and_store_keypair(
                 "storage_mode": storage_mode,
                 "endpoint": endpoint,
                 "status": "failed",
-                "api_key_id": str(api_key_context.id),
+                "api_key_id": str(api_key_context.credential_id),
             },
         )
         raise HTTPException(status_code=500, detail="Failed to store key metadata") from exc
@@ -330,7 +330,7 @@ def generate_and_store_keypair(
                 "storage_mode": storage_mode,
                 "endpoint": endpoint,
                 "status": "failed",
-                "api_key_id": str(api_key_context.id),
+                "api_key_id": str(api_key_context.credential_id),
             },
         )
         logger.exception("PQC key generation failed for algorithm=%s", algorithm)
@@ -339,7 +339,7 @@ def generate_and_store_keypair(
 
 def run_kem_encapsulation(
     *,
-    api_key_context: ApiKeyContext,
+    api_key_context: RequestAuthContext,
     algorithm: str,
     public_key: str,
     endpoint: str,
@@ -378,7 +378,7 @@ def run_kem_encapsulation(
                 "key_type": "kem",
                 "endpoint": endpoint,
                 "status": "success",
-                "api_key_id": str(api_key_context.id),
+                "api_key_id": str(api_key_context.credential_id),
             },
         )
         return response
@@ -403,7 +403,7 @@ def run_kem_encapsulation(
                 "key_type": "kem",
                 "endpoint": endpoint,
                 "status": "failed",
-                "api_key_id": str(api_key_context.id),
+                "api_key_id": str(api_key_context.credential_id),
             },
         )
         raise
@@ -428,7 +428,7 @@ def run_kem_encapsulation(
                 "key_type": "kem",
                 "endpoint": endpoint,
                 "status": "failed",
-                "api_key_id": str(api_key_context.id),
+                "api_key_id": str(api_key_context.credential_id),
             },
         )
         logger.exception("KEM encapsulation failed for algorithm=%s", algorithm)
@@ -437,7 +437,7 @@ def run_kem_encapsulation(
 
 def run_kem_decapsulation(
     *,
-    api_key_context: ApiKeyContext,
+    api_key_context: RequestAuthContext,
     algorithm: str,
     ciphertext: str,
     private_key: str,
@@ -477,7 +477,7 @@ def run_kem_decapsulation(
                 "key_type": "kem",
                 "endpoint": endpoint,
                 "status": "success",
-                "api_key_id": str(api_key_context.id),
+                "api_key_id": str(api_key_context.credential_id),
             },
         )
         return response
@@ -502,7 +502,7 @@ def run_kem_decapsulation(
                 "key_type": "kem",
                 "endpoint": endpoint,
                 "status": "failed",
-                "api_key_id": str(api_key_context.id),
+                "api_key_id": str(api_key_context.credential_id),
             },
         )
         raise
@@ -527,7 +527,7 @@ def run_kem_decapsulation(
                 "key_type": "kem",
                 "endpoint": endpoint,
                 "status": "failed",
-                "api_key_id": str(api_key_context.id),
+                "api_key_id": str(api_key_context.credential_id),
             },
         )
         logger.exception("KEM decapsulation failed for algorithm=%s", algorithm)
@@ -536,7 +536,7 @@ def run_kem_decapsulation(
 
 def run_sign_operation(
     *,
-    api_key_context: ApiKeyContext,
+    api_key_context: RequestAuthContext,
     algorithm: str,
     message: str,
     private_key: str,
@@ -575,7 +575,7 @@ def run_sign_operation(
                 "key_type": "signature",
                 "endpoint": endpoint,
                 "status": "success",
-                "api_key_id": str(api_key_context.id),
+                "api_key_id": str(api_key_context.credential_id),
             },
         )
         return response
@@ -600,7 +600,7 @@ def run_sign_operation(
                 "key_type": "signature",
                 "endpoint": endpoint,
                 "status": "failed",
-                "api_key_id": str(api_key_context.id),
+                "api_key_id": str(api_key_context.credential_id),
             },
         )
         raise
@@ -625,7 +625,7 @@ def run_sign_operation(
                 "key_type": "signature",
                 "endpoint": endpoint,
                 "status": "failed",
-                "api_key_id": str(api_key_context.id),
+                "api_key_id": str(api_key_context.credential_id),
             },
         )
         logger.exception("Signature creation failed for algorithm=%s", algorithm)
@@ -634,7 +634,7 @@ def run_sign_operation(
 
 def run_verify_operation(
     *,
-    api_key_context: ApiKeyContext,
+    api_key_context: RequestAuthContext,
     algorithm: str,
     message: str,
     signature: str,
@@ -681,7 +681,7 @@ def run_verify_operation(
                 "key_type": "signature",
                 "endpoint": endpoint,
                 "status": "success" if is_valid else "failed",
-                "api_key_id": str(api_key_context.id),
+                "api_key_id": str(api_key_context.credential_id),
             },
         )
         return response
@@ -706,7 +706,7 @@ def run_verify_operation(
                 "key_type": "signature",
                 "endpoint": endpoint,
                 "status": "failed",
-                "api_key_id": str(api_key_context.id),
+                "api_key_id": str(api_key_context.credential_id),
             },
         )
         raise
@@ -731,7 +731,7 @@ def run_verify_operation(
                 "key_type": "signature",
                 "endpoint": endpoint,
                 "status": "failed",
-                "api_key_id": str(api_key_context.id),
+                "api_key_id": str(api_key_context.credential_id),
             },
         )
         logger.exception("Signature verification failed for algorithm=%s", algorithm)

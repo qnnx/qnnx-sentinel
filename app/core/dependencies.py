@@ -13,7 +13,7 @@ from app.repositories.api_key_repo import APIKeyRepository
 from app.repositories.api_nonce_repo import APINonceRepository
 from app.repositories.api_security_event_repo import APISecurityEventRepository
 from app.repositories.user_repo import UserRepository
-from app.schemas.api_key import ApiKeyContext
+from app.schemas.request_auth import RequestAuthContext
 from app.security.request_signature import (
     extract_algorithm,
     extract_bearer_token,
@@ -87,13 +87,12 @@ def _build_request_metadata(request: Request) -> dict[str, Any]:
     }
 
 
-def _serialize_api_key(api_key) -> ApiKeyContext:
-    return ApiKeyContext(
-        id=api_key.id,
+def _serialize_request_auth(api_key) -> RequestAuthContext:
+    return RequestAuthContext(
+        credential_id=api_key.id,
         user_id=api_key.user_id,
         key_prefix=api_key.key_prefix,
         name=api_key.name,
-        is_active=(api_key.status or "").lower() == "active" and api_key.revoked_at is None,
     )
 
 
@@ -142,7 +141,12 @@ def _create_security_event(
         logger.exception("Failed to create audit log for security event")
 
 
-def _validate_algorithm(db, request: Request, payload: dict[str, Any], api_key_context: ApiKeyContext):
+def _validate_algorithm(
+    db,
+    request: Request,
+    payload: dict[str, Any],
+    auth_context: RequestAuthContext,
+):
     algorithm = extract_algorithm(payload)
     if not algorithm:
         raise HTTPException(status_code=400, detail="algorithm is required")
@@ -158,8 +162,8 @@ def _validate_algorithm(db, request: Request, payload: dict[str, Any], api_key_c
             request,
             "UNSUPPORTED_ALGORITHM",
             details={"algorithm": algorithm},
-            user_id=api_key_context.user_id,
-            api_key_id=api_key_context.id,
+            user_id=auth_context.user_id,
+            api_key_id=auth_context.credential_id,
         )
         raise HTTPException(status_code=400, detail="Unsupported or disabled algorithm")
 
@@ -191,7 +195,7 @@ async def verify_signed_request(request: Request):
         missing_headers.append("X-QNNX-Signature")
 
     db = SessionLocal()
-    api_key_context: ApiKeyContext | None = None
+    auth_context: RequestAuthContext | None = None
 
     try:
         if missing_headers:
@@ -235,7 +239,7 @@ async def verify_signed_request(request: Request):
             )
             raise HTTPException(status_code=401, detail="Invalid signing secret")
 
-        api_key_context = _serialize_api_key(api_key)
+        auth_context = _serialize_request_auth(api_key)
 
         if not settings.DISABLE_SIGNED_REQUEST_GUARDS:
             try:
@@ -246,8 +250,8 @@ async def verify_signed_request(request: Request):
                     request,
                     "EXPIRED_REQUEST",
                     details={"timestamp": timestamp, "reason": exc.detail},
-                    user_id=api_key_context.user_id,
-                    api_key_id=api_key_context.id,
+                    user_id=auth_context.user_id,
+                    api_key_id=auth_context.credential_id,
                 )
                 raise
 
@@ -257,8 +261,8 @@ async def verify_signed_request(request: Request):
                     request,
                     "EXPIRED_REQUEST",
                     details={"timestamp": timestamp},
-                    user_id=api_key_context.user_id,
-                    api_key_id=api_key_context.id,
+                    user_id=auth_context.user_id,
+                    api_key_id=auth_context.credential_id,
                 )
                 raise HTTPException(status_code=401, detail="Expired request")
 
@@ -276,25 +280,29 @@ async def verify_signed_request(request: Request):
                     request,
                     "INVALID_SIGNATURE",
                     details={"nonce": nonce, "timestamp": timestamp},
-                    user_id=api_key_context.user_id,
-                    api_key_id=api_key_context.id,
+                    user_id=auth_context.user_id,
+                    api_key_id=auth_context.credential_id,
                 )
                 raise HTTPException(status_code=401, detail="Invalid signature")
 
-        _validate_algorithm(db, request, payload or {}, api_key_context)
+        _validate_algorithm(db, request, payload or {}, auth_context)
 
         if not settings.DISABLE_SIGNED_REQUEST_GUARDS:
             cutoff = datetime.now(timezone.utc) - timedelta(seconds=REQUEST_TTL_SECONDS)
             api_nonce_repository.delete_created_before(db, cutoff)
 
-            if api_nonce_repository.get_by_key_and_nonce(db, str(api_key_context.id), nonce):
+            if api_nonce_repository.get_by_key_and_nonce(
+                db,
+                str(auth_context.credential_id),
+                nonce,
+            ):
                 _create_security_event(
                     db,
                     request,
                     "REPLAY_ATTACK",
                     details={"nonce": nonce},
-                    user_id=api_key_context.user_id,
-                    api_key_id=api_key_context.id,
+                    user_id=auth_context.user_id,
+                    api_key_id=auth_context.credential_id,
                 )
                 raise HTTPException(status_code=401, detail="Replay attack detected")
 
@@ -302,7 +310,7 @@ async def verify_signed_request(request: Request):
                 api_nonce_repository.create(
                     db,
                     {
-                        "api_key_id": api_key_context.id,
+                        "api_key_id": auth_context.credential_id,
                         "nonce": nonce,
                     },
                 )
@@ -313,12 +321,12 @@ async def verify_signed_request(request: Request):
                     request,
                     "REPLAY_ATTACK",
                     details={"nonce": nonce, "reason": "Unique constraint violation"},
-                    user_id=api_key_context.user_id,
-                    api_key_id=api_key_context.id,
+                    user_id=auth_context.user_id,
+                    api_key_id=auth_context.credential_id,
                 )
                 raise HTTPException(status_code=401, detail="Replay attack detected") from exc
 
-        api_key_repository.mark_used(db, str(api_key_context.id))
+        api_key_repository.mark_used(db, str(auth_context.credential_id))
     except HTTPException:
         raise
     except SQLAlchemyError as exc:
@@ -328,7 +336,7 @@ async def verify_signed_request(request: Request):
     finally:
         db.close()
 
-    yield api_key_context
+    yield auth_context
 
 
 validate_api_key = verify_signed_request

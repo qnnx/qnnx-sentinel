@@ -23,7 +23,10 @@ class ApiUsage(Base):
         default=uuid.uuid4,
         server_default=text("gen_random_uuid()"),
     )
-    user_id = Column(UUID(as_uuid=True))
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("public.users.id", ondelete="SET NULL"),
+    )
     api_key_id = Column(UUID(as_uuid=True), ForeignKey("public.api_keys.id", ondelete="SET NULL"))
 
     endpoint = Column(Text, nullable=False)

@@ -7,8 +7,8 @@ from app.core.config import settings
 from app.core.limiter import limiter
 
 from app.core.dependencies import verify_signed_request
-from app.schemas.api_key import ApiKeyContext
 from app.schemas.keygen import KeyGenRequest, KeyGenResponse
+from app.schemas.request_auth import RequestAuthContext
 from app.services.pqc_operation_service import generate_and_store_keypair
 
 router = APIRouter()
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 def generate_keys(
     request: Request,                      # RENAMED: from http_request to request
     payload: KeyGenRequest,                # RENAMED: from request to payload
-    api_key_context: ApiKeyContext = Depends(verify_signed_request),
+    api_key_context: RequestAuthContext = Depends(verify_signed_request),
 ):
     try:
         return KeyGenResponse(

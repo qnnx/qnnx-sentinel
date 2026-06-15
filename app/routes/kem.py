@@ -7,13 +7,13 @@ from app.core.config import settings
 from app.core.limiter import limiter
 
 from app.core.dependencies import verify_signed_request
-from app.schemas.api_key import ApiKeyContext
 from app.schemas.kem import (
     EncapsulationRequest,
     EncapsulationResponse,
     DecapsulationRequest,
     DecapsulationResponse
 )
+from app.schemas.request_auth import RequestAuthContext
 from app.services.pqc_operation_service import run_kem_decapsulation, run_kem_encapsulation
 
 router = APIRouter()
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 def kem_encapsulate(
     request: Request,                   # RENAMED: from http_request to request
     payload: EncapsulationRequest,      # RENAMED: from request to payload
-    api_key_context: ApiKeyContext = Depends(verify_signed_request),
+    api_key_context: RequestAuthContext = Depends(verify_signed_request),
 ):
     try:
         return EncapsulationResponse(
@@ -59,7 +59,7 @@ def kem_encapsulate(
 def kem_decapsulate(
     request: Request,                   # RENAMED: from http_request to request
     payload: DecapsulationRequest,      # RENAMED: from request to payload
-    api_key_context: ApiKeyContext = Depends(verify_signed_request),
+    api_key_context: RequestAuthContext = Depends(verify_signed_request),
 ):
     try:
         return DecapsulationResponse(

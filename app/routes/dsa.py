@@ -7,13 +7,13 @@ from app.core.config import settings
 from app.core.limiter import limiter
 
 from app.core.dependencies import verify_signed_request
-from app.schemas.api_key import ApiKeyContext
 from app.schemas.dsa import (
     SignRequest,
     SignResponse,
     VerifyRequest,
     VerifyResponse
 )
+from app.schemas.request_auth import RequestAuthContext
 from app.services.pqc_operation_service import run_sign_operation, run_verify_operation
 
 router = APIRouter()
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 def sign_message(
     request: Request,                   # RENAMED: from http_request to request
     payload: SignRequest,               # RENAMED: from request to payload
-    api_key_context: ApiKeyContext = Depends(verify_signed_request),
+    api_key_context: RequestAuthContext = Depends(verify_signed_request),
 ):
     try:
         return SignResponse(
@@ -60,7 +60,7 @@ def sign_message(
 def verify_signature(
     request: Request,                   # RENAMED: from http_request to request
     payload: VerifyRequest,             # RENAMED: from request to payload
-    api_key_context: ApiKeyContext = Depends(verify_signed_request),
+    api_key_context: RequestAuthContext = Depends(verify_signed_request),
 ):
     try:
         return VerifyResponse(

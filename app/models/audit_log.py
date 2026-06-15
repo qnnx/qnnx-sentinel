@@ -28,7 +28,10 @@ class AuditLog(Base):
     resource_id = Column(Text)
     status = Column(Text, nullable=False)
 
-    user_id = Column(UUID(as_uuid=True))
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("public.users.id"),
+    )
     api_key_id = Column(UUID(as_uuid=True), ForeignKey("public.api_keys.id", ondelete="SET NULL"))
     ip_address = Column(Text)
 

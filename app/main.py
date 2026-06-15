@@ -14,7 +14,6 @@ from app.routes.algorithms import router as algorithms_router
 from app.routes.health import router as health_router
 from app.routes.kem import router as kem_router
 from app.routes.dsa import router as dsa_router
-from app.routes.api_keys import router as api_keys_router
 from app.routes.audit_logs import router as audit_logs_router
 from app.routes.api_usage import router as usage_router
 from app.routes.keygen import router as keygen_router
@@ -62,7 +61,6 @@ app.include_router(algorithms_router, prefix=settings.API_V1_STR, tags=["Algorit
 app.include_router(keygen_router, prefix=settings.API_V1_STR, tags=["Key Generation"])
 app.include_router(kem_router, prefix=settings.API_V1_STR, tags=["KEM"])
 app.include_router(dsa_router, prefix=settings.API_V1_STR, tags=["DSA"])
-app.include_router(api_keys_router, prefix=settings.API_V1_STR, tags=["API Keys"])
 app.include_router(audit_logs_router, prefix=settings.API_V1_STR, tags=["Audit Logs"])
 app.include_router(usage_router, prefix=settings.API_V1_STR, tags=["Usage"])
 
