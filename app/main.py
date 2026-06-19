@@ -1,5 +1,11 @@
+from contextlib import asynccontextmanager
+import threading
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.errors import RateLimitExceeded
+
 import app.models
 from app.core.config import settings
 from app.core.exceptions import (
@@ -18,24 +24,39 @@ from app.routes.audit_logs import router as audit_logs_router
 from app.routes.api_usage import router as usage_router
 from app.routes.keygen import router as keygen_router
 from app.core.limiter import limiter
-from slowapi.middleware import SlowAPIMiddleware
-from slowapi.errors import RateLimitExceeded
-from fastapi.responses import JSONResponse
+from app.security.sysmon import poll_windows_sysmon
 
+
+# --- 1. Lifespan Manager ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("[*] Initializing QNNX-Sentinel Security Subsystems...")
+    
+    # Start the Sysmon HIDS bridge in a background daemon thread
+    hids_thread = threading.Thread(target=poll_windows_sysmon, daemon=True)
+    hids_thread.start()
+    
+    yield # The FastAPI app runs here
+    
+    print("[*] Shutting down...")
+
+
+# --- 2. Single App Initialization ---
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     description=settings.DESCRIPTION,
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan  # <-- Lifespan attached here!
 )
 
-# Store the limiter in the app state
+# --- 3. Middleware & State ---
 app.state.limiter = limiter
-
-# Add the SlowAPI middleware to intercept requests
 app.add_middleware(SlowAPIMiddleware)
 
+
+# --- 4. Custom Handlers ---
 def rate_limit_custom_handler(request: Request, exc: RateLimitExceeded):
     return JSONResponse(
         status_code=429,
@@ -51,11 +72,12 @@ app.add_exception_handler(400, bad_request_handler)
 app.add_exception_handler(401, unauthorized_handler)
 app.add_exception_handler(403, forbidden_handler)
 app.add_exception_handler(404, not_found_handler)
-app.add_exception_handler(RequestValidationError, validation_error_handler)
+#app.add_exception_handler(RequestValidationError, validation_error_handler)
 app.add_exception_handler(500, internal_server_error_handler)
 app.add_exception_handler(RateLimitExceeded, rate_limit_custom_handler)
 
-# Routes
+
+# --- 5. Routes ---
 app.include_router(health_router, prefix=settings.API_V1_STR, tags=["Health"])
 app.include_router(algorithms_router, prefix=settings.API_V1_STR, tags=["Algorithms"])
 app.include_router(keygen_router, prefix=settings.API_V1_STR, tags=["Key Generation"])
@@ -63,6 +85,7 @@ app.include_router(kem_router, prefix=settings.API_V1_STR, tags=["KEM"])
 app.include_router(dsa_router, prefix=settings.API_V1_STR, tags=["DSA"])
 app.include_router(audit_logs_router, prefix=settings.API_V1_STR, tags=["Audit Logs"])
 app.include_router(usage_router, prefix=settings.API_V1_STR, tags=["Usage"])
+
 
 @app.get("/", include_in_schema=False)
 def root():

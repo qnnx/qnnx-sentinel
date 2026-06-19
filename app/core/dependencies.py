@@ -24,6 +24,7 @@ from app.security.request_signature import (
 from app.services.audit_log_service import create_audit_log
 from app.services.algorithm_support import is_algorithm_executable
 from app.utils.crypto import sha256_hex
+from app.security.alert import hids_engine
 
 REQUEST_TTL_SECONDS = 300
 ACTIVE_ALGORITHM_STATUSES = {"active", "enabled", "recommended"}
@@ -140,6 +141,17 @@ def _create_security_event(
     except Exception:
         logger.exception("Failed to create audit log for security event")
 
+    try:
+        client_ip = request.client.host
+        # If your engine has a process_api_event method, call it here. 
+        # Alternatively, adapt the logic to route API events into the engine.
+        hids_engine.process_api_event(
+            event_type=event_type, 
+            ip_address=client_ip, 
+            details=details
+        )
+    except Exception as e:
+        print(f"[!] Alert Engine Failure: {e}")
 
 def _validate_algorithm(
     db,
