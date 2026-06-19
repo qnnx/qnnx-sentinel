@@ -4,6 +4,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import Header, HTTPException, Request
+from cryptography.exceptions import InvalidTag
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.core.config import settings
@@ -23,7 +24,7 @@ from app.security.request_signature import (
 )
 from app.services.audit_log_service import create_audit_log
 from app.services.algorithm_support import is_algorithm_executable
-from app.utils.crypto import sha256_hex
+from app.utils.crypto import decrypt_aes_gcm_secret, sha256_hex
 
 REQUEST_TTL_SECONDS = 300
 ACTIVE_ALGORITHM_STATUSES = {"active", "enabled", "recommended"}
@@ -177,7 +178,7 @@ async def verify_signed_request(request: Request):
     request.state.algorithm = extract_algorithm(payload)
 
     authorization = request.headers.get("Authorization")
-    signing_secret = request.headers.get("X-QNNX-Signing-Secret")
+    signing_secret_header = request.headers.get("X-QNNX-Signing-Secret")
     timestamp = request.headers.get("X-QNNX-Timestamp")
     nonce = request.headers.get("X-QNNX-Nonce")
     signature = request.headers.get("X-QNNX-Signature")
@@ -185,8 +186,6 @@ async def verify_signed_request(request: Request):
     missing_headers = []
     if not authorization:
         missing_headers.append("Authorization")
-    if not settings.DISABLE_SIGNED_REQUEST_GUARDS and not signing_secret:
-        missing_headers.append("X-QNNX-Signing-Secret")
     if not settings.DISABLE_SIGNED_REQUEST_GUARDS and not timestamp:
         missing_headers.append("X-QNNX-Timestamp")
     if not settings.DISABLE_SIGNED_REQUEST_GUARDS and not nonce:
@@ -206,6 +205,15 @@ async def verify_signed_request(request: Request):
                 details={"missing_headers": missing_headers},
             )
             raise HTTPException(status_code=401, detail="Missing required authentication headers")
+
+        if not settings.DISABLE_SIGNED_REQUEST_GUARDS and signing_secret_header:
+            _create_security_event(
+                db,
+                request,
+                "SIGNING_SECRET_HEADER_REJECTED",
+                details={"reason": "Signing secrets must not be sent in headers"},
+            )
+            raise HTTPException(status_code=401, detail="Signing secret header is not accepted")
 
         raw_api_key = extract_bearer_token(authorization)
         if not raw_api_key:
@@ -227,21 +235,41 @@ async def verify_signed_request(request: Request):
             )
             raise HTTPException(status_code=401, detail="Invalid API key")
 
-        if (
-            not settings.DISABLE_SIGNED_REQUEST_GUARDS
-            and api_key.signing_secret_hash != sha256_hex(signing_secret)
-        ):
-            _create_security_event(
-                db,
-                request,
-                "INVALID_SIGNING_SECRET",
-                details={"key_prefix": raw_api_key[:12]},
-            )
-            raise HTTPException(status_code=401, detail="Invalid signing secret")
-
         auth_context = _serialize_request_auth(api_key)
 
         if not settings.DISABLE_SIGNED_REQUEST_GUARDS:
+            if not settings.MASTER_KEY:
+                logger.error("MASTER_KEY is required to verify signed requests")
+                raise HTTPException(status_code=500, detail="Signed request verification is not configured")
+
+            if not api_key.signing_secret_encrypted:
+                _create_security_event(
+                    db,
+                    request,
+                    "SIGNING_SECRET_UNAVAILABLE",
+                    details={"key_prefix": raw_api_key[:12]},
+                    user_id=auth_context.user_id,
+                    api_key_id=auth_context.credential_id,
+                )
+                raise HTTPException(status_code=401, detail="Invalid signing secret")
+
+            try:
+                signing_secret = decrypt_aes_gcm_secret(
+                    api_key.signing_secret_encrypted,
+                    settings.MASTER_KEY,
+                )
+            except (InvalidTag, ValueError, UnicodeDecodeError) as exc:
+                logger.exception("Failed to decrypt signing secret for API key %s", auth_context.credential_id)
+                _create_security_event(
+                    db,
+                    request,
+                    "SIGNING_SECRET_DECRYPTION_FAILED",
+                    details={"key_prefix": raw_api_key[:12]},
+                    user_id=auth_context.user_id,
+                    api_key_id=auth_context.credential_id,
+                )
+                raise HTTPException(status_code=401, detail="Invalid signing secret") from exc
+
             try:
                 timestamp_is_fresh = is_timestamp_fresh(timestamp, REQUEST_TTL_SECONDS)
             except HTTPException as exc:

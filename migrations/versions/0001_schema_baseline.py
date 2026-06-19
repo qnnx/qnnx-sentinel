@@ -59,7 +59,7 @@ def upgrade() -> None:
             last_used_at timestamptz,
             created_at timestamptz NOT NULL DEFAULT now(),
             key_prefix text,
-            signing_secret_hash text,
+            signing_secret_encrypted text,
             revoked_at timestamptz
         )
         """

@@ -28,7 +28,7 @@ class ApiKey(Base):
     )
     key_prefix = Column(Text)
     key_hash = Column(Text, nullable=False, unique=True)
-    signing_secret_hash = Column(Text, nullable=False)
+    signing_secret_encrypted = Column(Text)
     name = Column(Text, nullable=False)
     status = Column(Text, nullable=False, server_default=text("'active'"))
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

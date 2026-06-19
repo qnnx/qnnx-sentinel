@@ -137,25 +137,35 @@ def _record_failure(
     resource_type: str | None = None,
     resource_id: str | None = None,
 ) -> bool:
-    return _record_operation(
-        api_key_context=api_key_context,
-        endpoint=endpoint,
-        method=method,
-        operation=operation,
-        algorithm=algorithm,
-        response_status=response_status,
-        success=False,
-        response_time_ms=response_time_ms,
-        audit_action=audit_action,
-        audit_status="failed",
-        api_key_id=api_key_id,
-        ip_address=ip_address,
-        user_agent=user_agent,
-        resource_type=resource_type,
-        resource_id=resource_id,
-        error_type=error_type,
-        details=details,
-    )
+    try:
+        create_audit_log(
+            action=audit_action,
+            user_id=str(api_key_context.user_id),
+            api_key_id=api_key_id or str(api_key_context.credential_id),
+            status="failed",
+            ip_address=ip_address,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            details={
+                **details,
+                "response_status": response_status,
+                "response_time_ms": response_time_ms,
+                "error_type": error_type,
+            },
+        )
+        return True
+    except Exception:
+        logger.critical(
+            "SECURITY AUDIT WRITE FAILED operation=%s action=%s status=failed "
+            "algorithm=%s endpoint=%s api_key_id=%s",
+            operation,
+            audit_action,
+            algorithm,
+            endpoint,
+            api_key_id or str(api_key_context.credential_id),
+            exc_info=True,
+        )
+        return False
 
 
 def _resolve_algorithm_record(algorithm: str):
