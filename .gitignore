@@ -16,3 +16,6 @@ test_repo.py
 *.ini
 tests/*
 *.log
+check_stats.py
+fix_db_schema.py
+create_mock_data.py

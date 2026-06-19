@@ -20,7 +20,7 @@ tunnel_state_repo = TunnelStateRepository()
 PQC_API_BASE_URL = getattr(settings, "PQC_API_BASE_URL", "http://127.0.0.1:8000")
 
 # ⚠️ PASTE YOUR RAW API KEY HERE ⚠️
-GATEWAY_API_KEY = "qnnx_PASTE_YOUR_RAW_KEY_HERE" 
+GATEWAY_API_KEY = "qnnx_mock_vpn_token_abc123" 
 
 class HandshakeError(Exception):
     """Raised whenever the handshake can't proceed (unknown client, API failure, etc.)"""
@@ -98,6 +98,18 @@ def establish_session(db: DBSession, client_identifier: str, kem_ciphertext: byt
         "remote_ip": remote_ip,
         "remote_port": remote_port,
         "last_heartbeat": datetime.now(timezone.utc),
+    })
+
+    # Step 5b: Initialize traffic statistics
+    from app.repositories.traffic_stat_repo import TrafficStatRepository
+    ts_stat_repo = TrafficStatRepository()
+    ts_stat_repo.create(db, {
+        "id": uuid.uuid4(),
+        "session_id": session_id,
+        "bytes_sent": 0,
+        "bytes_received": 0,
+        "packets_sent": 0,
+        "packets_received": 0,
     })
 
     # Step 6: Update client last seen
