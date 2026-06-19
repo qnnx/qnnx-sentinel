@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 import app.models
@@ -21,13 +23,33 @@ from app.core.limiter import limiter
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.errors import RateLimitExceeded
 from fastapi.responses import JSONResponse
+from app.gateway.socket_server import start_gateway_server
+import logging
+logging.basicConfig(level=logging.INFO)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: launch the raw-socket VPN gateway listener on the same
+    # event loop as the FastAPI/SlowAPI HTTP server.
+    gateway_server = await start_gateway_server()
+    app.state.gateway_server = gateway_server
+
+    yield  # app runs normally here until shutdown is triggered
+
+    # Shutdown: close the gateway listener cleanly so no connections
+    # are left dangling when the process stops.
+    gateway_server.close()
+    await gateway_server.wait_closed()
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     description=settings.DESCRIPTION,
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 # Store the limiter in the app state
