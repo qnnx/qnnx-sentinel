@@ -1,15 +1,16 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.exceptions import RequestValidationError
 import app.models
 from app.core.config import settings
 from app.core.exceptions import (
-    bad_request_handler,
-    unauthorized_handler,
-    forbidden_handler,
-    not_found_handler,
+    AppError,
+    app_error_handler,
+    http_exception_handler,
     validation_error_handler,
-    internal_server_error_handler
+    sqlalchemy_error_handler,
+    catch_all_exception_handler
 )
+from sqlalchemy.exc import SQLAlchemyError
 from app.routes.algorithms import router as algorithms_router
 from app.routes.health import router as health_router
 from app.routes.kem import router as kem_router
@@ -47,12 +48,11 @@ def rate_limit_custom_handler(request: Request, exc: RateLimitExceeded):
     )
 
 # Error Handlers
-app.add_exception_handler(400, bad_request_handler)
-app.add_exception_handler(401, unauthorized_handler)
-app.add_exception_handler(403, forbidden_handler)
-app.add_exception_handler(404, not_found_handler)
+app.add_exception_handler(AppError, app_error_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_error_handler)
-app.add_exception_handler(500, internal_server_error_handler)
+app.add_exception_handler(SQLAlchemyError, sqlalchemy_error_handler)
+app.add_exception_handler(Exception, catch_all_exception_handler)
 app.add_exception_handler(RateLimitExceeded, rate_limit_custom_handler)
 
 # Routes

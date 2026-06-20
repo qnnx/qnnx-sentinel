@@ -1,12 +1,10 @@
 import base64
 import uuid
 
-from fastapi import HTTPException
-
+from app.core.exceptions import AlgorithmNotSupportedError, ValidationError
 from app.crypto.dsa import DSAManager
 from app.crypto.kem import KEMManager
 from app.services import dsa_service, kem_service
-
 
 SUPPORTED_KEMS = {name.casefold(): name for name in KEMManager.get_supported_kems()}
 SUPPORTED_DSAS = {name.casefold(): name for name in DSAManager.get_supported_dsas()}
@@ -22,15 +20,12 @@ def _resolve_algorithm(algorithm: str) -> tuple[str, str]:
         return "kem", SUPPORTED_KEMS[normalized_algorithm]
     if normalized_algorithm in SUPPORTED_DSAS:
         return "dsa", SUPPORTED_DSAS[normalized_algorithm]
-    raise HTTPException(
-        status_code=400,
-        detail=f"Unsupported algorithm: '{algorithm}'",
-    )
+    raise AlgorithmNotSupportedError(f"Unsupported algorithm: '{algorithm}'")
 
 
 def generate_keypair(algorithm: str) -> dict:
     if not algorithm or not algorithm.strip():
-        raise HTTPException(status_code=400, detail="algorithm is required")
+        raise ValidationError("algorithm is required")
 
     key_type, canonical_algorithm = _resolve_algorithm(algorithm)
     if key_type == "kem":

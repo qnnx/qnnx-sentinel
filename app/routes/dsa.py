@@ -31,24 +31,19 @@ def sign_message(
     payload: SignRequest,               # RENAMED: from request to payload
     api_key_context: RequestAuthContext = Depends(verify_signed_request),
 ):
-    try:
-        return SignResponse(
-            **run_sign_operation(
-                api_key_context=api_key_context,
-                algorithm=payload.algorithm,       # UPDATED to use payload
-                message=payload.message,           # UPDATED to use payload
-                private_key=payload.private_key,   # UPDATED to use payload
-                endpoint=request.url.path,         # UPDATED to use request
-                method=request.method,             # UPDATED to use request
-                ip_address=request.client.host if request.client else None, # UPDATED
-                user_agent=request.headers.get("user-agent"),               # UPDATED
-            )
+    return SignResponse(
+        **run_sign_operation(
+            api_key_context=api_key_context,
+            algorithm=payload.algorithm,       # UPDATED to use payload
+            message=payload.message,           # UPDATED to use payload
+            private_key=payload.private_key,   # UPDATED to use payload
+            key_id=payload.key_id,
+            endpoint=request.url.path,         # UPDATED to use request
+            method=request.method,             # UPDATED to use request
+            ip_address=request.client.host if request.client else None, # UPDATED
+            user_agent=request.headers.get("user-agent"),               # UPDATED
         )
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.exception("Signing failed")
-        raise HTTPException(status_code=500, detail="Signing failed") from exc
+    )
 
 @router.post(
     "/verify",
@@ -62,22 +57,16 @@ def verify_signature(
     payload: VerifyRequest,             # RENAMED: from request to payload
     api_key_context: RequestAuthContext = Depends(verify_signed_request),
 ):
-    try:
-        return VerifyResponse(
-            **run_verify_operation(
-                api_key_context=api_key_context,
-                algorithm=payload.algorithm,       # UPDATED to use payload
-                message=payload.message,           # UPDATED to use payload
-                signature=payload.signature,       # UPDATED to use payload
-                public_key=payload.public_key,     # UPDATED to use payload
-                endpoint=request.url.path,         # UPDATED to use request
-                method=request.method,             # UPDATED to use request
-                ip_address=request.client.host if request.client else None, # UPDATED
-                user_agent=request.headers.get("user-agent"),               # UPDATED
-            )
+    return VerifyResponse(
+        **run_verify_operation(
+            api_key_context=api_key_context,
+            algorithm=payload.algorithm,       # UPDATED to use payload
+            message=payload.message,           # UPDATED to use payload
+            signature=payload.signature,       # UPDATED to use payload
+            public_key=payload.public_key,     # UPDATED to use payload
+            endpoint=request.url.path,         # UPDATED to use request
+            method=request.method,             # UPDATED to use request
+            ip_address=request.client.host if request.client else None, # UPDATED
+            user_agent=request.headers.get("user-agent"),               # UPDATED
         )
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.exception("Verification failed")
-        raise HTTPException(status_code=500, detail="Verification failed") from exc
+    )

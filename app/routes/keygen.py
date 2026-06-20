@@ -26,20 +26,14 @@ def generate_keys(
     payload: KeyGenRequest,                # RENAMED: from request to payload
     api_key_context: RequestAuthContext = Depends(verify_signed_request),
 ):
-    try:
-        return KeyGenResponse(
-            **generate_and_store_keypair(
-                api_key_context=api_key_context,
-                algorithm=payload.algorithm,       # UPDATED to use payload
-                storage_mode=payload.storage_mode, # UPDATED to use payload
-                endpoint=request.url.path,         # UPDATED to use request
-                method=request.method,             # UPDATED to use request
-                ip_address=request.client.host if request.client else None, # UPDATED
-                user_agent=request.headers.get("user-agent"),               # UPDATED
-            )
+    return KeyGenResponse(
+        **generate_and_store_keypair(
+            api_key_context=api_key_context,
+            algorithm=payload.algorithm,       # UPDATED to use payload
+            storage_mode=payload.storage_mode, # UPDATED to use payload
+            endpoint=request.url.path,         # UPDATED to use request
+            method=request.method,             # UPDATED to use request
+            ip_address=request.client.host if request.client else None, # UPDATED
+            user_agent=request.headers.get("user-agent"),               # UPDATED
         )
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.exception("Key generation failed")
-        raise HTTPException(status_code=500, detail="Key generation failed") from exc
+    )

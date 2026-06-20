@@ -30,7 +30,7 @@ class Key(Base):
 
     public_key = Column(Text, nullable=False)
     private_key_ref = Column(Text)
-    storage_mode = Column(Text, nullable=False, server_default=text("'customer_managed'"))
+    storage_mode = Column(Text, nullable=False, server_default=text("'sentinel_managed'"))
     private_key_exported = Column(Boolean, nullable=False, server_default=text("false"))
     name = Column(Text)
     purpose = Column(Text)

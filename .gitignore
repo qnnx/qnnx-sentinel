@@ -47,3 +47,14 @@ zota.py
 
 .DS_Store
 Thumbs.db
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3

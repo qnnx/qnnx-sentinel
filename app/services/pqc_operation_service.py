@@ -6,6 +6,15 @@ from uuid import uuid4
 
 from fastapi import HTTPException
 from sqlalchemy.exc import SQLAlchemyError
+from app.core.exceptions import (
+    AppError,
+    ValidationError,
+    AlgorithmNotSupportedError,
+    KeygenError,
+    EncapsulationError,
+    DecapsulationError,
+    DatabaseError
+)
 
 from app.core.database import SessionLocal
 from app.repositories.algorithm_repo import AlgorithmRepository
@@ -24,11 +33,28 @@ def _decode_base64(value: str, field_name: str) -> bytes:
     try:
         return base64.b64decode(value, validate=True)
     except (binascii.Error, ValueError) as exc:
-        raise HTTPException(status_code=400, detail=f"Invalid Base64 for {field_name}") from exc
+        raise ValidationError(f"Invalid Base64 for {field_name}") from exc
 
 
 def _encode_base64(value: bytes) -> str:
     return base64.b64encode(value).decode("ascii")
+
+
+def _resolve_private_key(private_key_input: str) -> bytes:
+    import uuid
+    try:
+        key_id = uuid.UUID(private_key_input)
+    except ValueError:
+        return _decode_base64(private_key_input, "private_key")
+
+    from app.security.key_vault import PQCKeyVault, KeyVaultError
+    vault = PQCKeyVault()
+    try:
+        return vault.get_private_key(key_id)
+    except KeyVaultError as exc:
+        raise ValidationError(f"Failed to retrieve private key: {exc}") from exc
+    finally:
+        vault.close()
 
 
 def _record_operation(
@@ -173,7 +199,7 @@ def _resolve_algorithm_record(algorithm: str):
     try:
         record = algorithm_repository.get_by_identifier(db, algorithm)
         if not record:
-            raise HTTPException(status_code=400, detail="Algorithm not found")
+            raise AlgorithmNotSupportedError(f"Algorithm not found: '{algorithm}'")
         return record
     finally:
         db.close()
@@ -185,7 +211,7 @@ def _detect_key_type(algorithm_type: str) -> str:
         return "kem"
     if normalized in {"signature", "sig", "dsa"}:
         return "signature"
-    raise HTTPException(status_code=400, detail=f"Unsupported algorithm family: {algorithm_type}")
+    raise ValidationError(f"Unsupported algorithm family: {algorithm_type}")
 
 
 def generate_and_store_keypair(
@@ -204,7 +230,56 @@ def generate_and_store_keypair(
         key_type = _detect_key_type(algorithm_record.type)
 
         if storage_mode == "sentinel_managed":
-            raise HTTPException(status_code=501, detail="sentinel_managed storage not implemented yet")
+            from app.security.key_vault import PQCKeyVault
+            vault = PQCKeyVault()
+            try:
+                vault_response = vault.generate_keypair(
+                    owner_id=api_key_context.user_id,
+                    algorithm=algorithm
+                )
+            finally:
+                vault.close()
+
+            response = {
+                "key_id": vault_response["key_id"],
+                "algorithm": vault_response["algorithm"],
+                "key_type": key_type,
+                "public_key": vault_response["public_key"],
+                "private_key": None,
+                "private_key_ref": None,
+                "storage_mode": "sentinel_managed",
+                "private_key_exported": False,
+                "status": "active"
+            }
+
+            elapsed_ms = int((time.perf_counter() - start) * 1000)
+            _record_operation(
+                api_key_context=api_key_context,
+                endpoint=endpoint,
+                method=method,
+                operation="keygen",
+                algorithm=vault_response["algorithm"],
+                response_status=200,
+                success=True,
+                response_time_ms=elapsed_ms,
+                audit_action="KEY_GENERATED",
+                audit_status="success",
+                resource_type="key",
+                resource_id=vault_response["key_id"],
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={
+                    "algorithm": vault_response["algorithm"],
+                    "operation": "keygen",
+                    "key_type": key_type,
+                    "key_id": vault_response["key_id"],
+                    "storage_mode": "sentinel_managed",
+                    "endpoint": endpoint,
+                    "status": "success",
+                    "api_key_id": str(api_key_context.credential_id),
+                },
+            )
+            return response
 
         if key_type == "kem":
             raw_response = kem_service.generate_kem_keypair(algorithm_record.name)
@@ -269,7 +344,7 @@ def generate_and_store_keypair(
             },
         )
         return response
-    except HTTPException as exc:
+    except AppError as exc:
         elapsed_ms = int((time.perf_counter() - start) * 1000)
         _record_failure(
             api_key_context=api_key_context,
@@ -283,7 +358,7 @@ def generate_and_store_keypair(
             ip_address=ip_address,
             user_agent=user_agent,
             resource_type="key",
-            error_type=exc.detail if isinstance(exc.detail, str) else "HTTP_ERROR",
+            error_type=exc.error_code,
             details={
                 "algorithm": algorithm,
                 "operation": "keygen",
@@ -318,7 +393,7 @@ def generate_and_store_keypair(
                 "api_key_id": str(api_key_context.credential_id),
             },
         )
-        raise HTTPException(status_code=500, detail="Failed to store key metadata") from exc
+        raise DatabaseError("Failed to store key metadata") from exc
     except Exception as exc:
         elapsed_ms = int((time.perf_counter() - start) * 1000)
         _record_failure(
@@ -344,7 +419,7 @@ def generate_and_store_keypair(
             },
         )
         logger.exception("PQC key generation failed for algorithm=%s", algorithm)
-        raise HTTPException(status_code=500, detail="Key generation failed") from exc
+        raise KeygenError("Key generation failed") from exc
 
 
 def run_kem_encapsulation(
@@ -392,7 +467,7 @@ def run_kem_encapsulation(
             },
         )
         return response
-    except HTTPException as exc:
+    except AppError as exc:
         elapsed_ms = int((time.perf_counter() - start) * 1000)
         _record_failure(
             api_key_context=api_key_context,
@@ -406,7 +481,7 @@ def run_kem_encapsulation(
             ip_address=ip_address,
             user_agent=user_agent,
             resource_type="kem_operation",
-            error_type=exc.detail if isinstance(exc.detail, str) else "HTTP_ERROR",
+            error_type=exc.error_code,
             details={
                 "algorithm": algorithm,
                 "operation": "kem_encapsulate",
@@ -442,7 +517,7 @@ def run_kem_encapsulation(
             },
         )
         logger.exception("KEM encapsulation failed for algorithm=%s", algorithm)
-        raise HTTPException(status_code=500, detail="KEM encapsulation failed") from exc
+        raise EncapsulationError("KEM encapsulation failed") from exc
 
 
 def run_kem_decapsulation(
@@ -450,7 +525,8 @@ def run_kem_decapsulation(
     api_key_context: RequestAuthContext,
     algorithm: str,
     ciphertext: str,
-    private_key: str,
+    private_key: str | None = None,
+    key_id: str | None = None,
     endpoint: str,
     method: str,
     ip_address: str | None = None,
@@ -459,7 +535,10 @@ def run_kem_decapsulation(
     start = time.perf_counter()
     try:
         decoded_ciphertext = _decode_base64(ciphertext, "ciphertext")
-        decoded_private_key = _decode_base64(private_key, "private_key")
+        key_input = key_id or private_key
+        if not key_input:
+            raise ValidationError("Either private_key or key_id must be provided")
+        decoded_private_key = _resolve_private_key(key_input)
         result = kem_service.decapsulate_secret(algorithm, decoded_ciphertext, decoded_private_key)
         response = {
             "algorithm": result["algorithm"],
@@ -491,7 +570,7 @@ def run_kem_decapsulation(
             },
         )
         return response
-    except HTTPException as exc:
+    except AppError as exc:
         elapsed_ms = int((time.perf_counter() - start) * 1000)
         _record_failure(
             api_key_context=api_key_context,
@@ -505,7 +584,7 @@ def run_kem_decapsulation(
             ip_address=ip_address,
             user_agent=user_agent,
             resource_type="kem_operation",
-            error_type=exc.detail if isinstance(exc.detail, str) else "HTTP_ERROR",
+            error_type=exc.error_code,
             details={
                 "algorithm": algorithm,
                 "operation": "kem_decapsulate",
@@ -541,7 +620,7 @@ def run_kem_decapsulation(
             },
         )
         logger.exception("KEM decapsulation failed for algorithm=%s", algorithm)
-        raise HTTPException(status_code=500, detail="KEM decapsulation failed") from exc
+        raise DecapsulationError("KEM decapsulation failed") from exc
 
 
 def run_sign_operation(
@@ -549,7 +628,8 @@ def run_sign_operation(
     api_key_context: RequestAuthContext,
     algorithm: str,
     message: str,
-    private_key: str,
+    private_key: str | None = None,
+    key_id: str | None = None,
     endpoint: str,
     method: str,
     ip_address: str | None = None,
@@ -557,7 +637,10 @@ def run_sign_operation(
 ) -> dict:
     start = time.perf_counter()
     try:
-        decoded_private_key = _decode_base64(private_key, "private_key")
+        key_input = key_id or private_key
+        if not key_input:
+            raise ValidationError("Either private_key or key_id must be provided")
+        decoded_private_key = _resolve_private_key(key_input)
         result = dsa_service.sign_message(algorithm, message.encode("utf-8"), decoded_private_key)
         response = {
             "algorithm": result["algorithm"],
@@ -589,7 +672,7 @@ def run_sign_operation(
             },
         )
         return response
-    except HTTPException as exc:
+    except AppError as exc:
         elapsed_ms = int((time.perf_counter() - start) * 1000)
         _record_failure(
             api_key_context=api_key_context,
@@ -603,7 +686,7 @@ def run_sign_operation(
             ip_address=ip_address,
             user_agent=user_agent,
             resource_type="signature_operation",
-            error_type=exc.detail if isinstance(exc.detail, str) else "HTTP_ERROR",
+            error_type=exc.error_code,
             details={
                 "algorithm": algorithm,
                 "operation": "sign",
@@ -639,7 +722,7 @@ def run_sign_operation(
             },
         )
         logger.exception("Signature creation failed for algorithm=%s", algorithm)
-        raise HTTPException(status_code=500, detail="Signing failed") from exc
+        raise ValidationError("Signing failed") from exc
 
 
 def run_verify_operation(
@@ -695,7 +778,7 @@ def run_verify_operation(
             },
         )
         return response
-    except HTTPException as exc:
+    except AppError as exc:
         elapsed_ms = int((time.perf_counter() - start) * 1000)
         _record_failure(
             api_key_context=api_key_context,
@@ -709,7 +792,7 @@ def run_verify_operation(
             ip_address=ip_address,
             user_agent=user_agent,
             resource_type="signature_operation",
-            error_type=exc.detail if isinstance(exc.detail, str) else "HTTP_ERROR",
+            error_type=exc.error_code,
             details={
                 "algorithm": algorithm,
                 "operation": "verify",
@@ -745,4 +828,4 @@ def run_verify_operation(
             },
         )
         logger.exception("Signature verification failed for algorithm=%s", algorithm)
-        raise HTTPException(status_code=500, detail="Verification failed") from exc
+        raise ValidationError("Verification failed") from exc
