@@ -13,12 +13,13 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     DATABASE_URL: str
     MASTER_KEY: str | None = None
+    SECRET_ENCRYPTION_KEY: str
     DISABLE_SIGNED_REQUEST_GUARDS: bool = False
     OQS_INSTALL_PATH: str | None = None
-    KEYGEN_RATE_LIMIT: str = "30/minute"
-    KEM_RATE_LIMIT: str = "100/minute"
-    SIGN_RATE_LIMIT: str = "60/minute"
-    VERIFY_RATE_LIMIT: str = "120/minute"
+    KEYGEN_RATE_LIMIT: str = "300/minute"
+    KEM_RATE_LIMIT: str = "1000/minute"
+    SIGN_RATE_LIMIT: str = "600/minute"
+    VERIFY_RATE_LIMIT: str = "600/minute"
 
     @model_validator(mode="after")
     def validate_security_and_oqs(self) -> "Settings":
@@ -26,11 +27,15 @@ class Settings(BaseSettings):
         if not self.DISABLE_SIGNED_REQUEST_GUARDS and not self.MASTER_KEY:
             raise ValueError("MASTER_KEY must be configured when DISABLE_SIGNED_REQUEST_GUARDS is False")
 
-        # 2. Inject OQS_INSTALL_PATH to environment if set
+        # 2. Enforce minimum entropy for the pgcrypto encryption passphrase
+        if len(self.SECRET_ENCRYPTION_KEY) < 32:
+            raise ValueError("SECRET_ENCRYPTION_KEY must be at least 32 characters")
+
+        # 3. Inject OQS_INSTALL_PATH to environment if set
         if self.OQS_INSTALL_PATH:
             os.environ["OQS_INSTALL_PATH"] = self.OQS_INSTALL_PATH
 
-        # 3. Verify liboqs loadable
+        # 4. Verify liboqs loadable
         try:
             # Import locally to avoid circular dependencies
             from app.crypto._oqs_loader import _configure_oqs_install_path, _require_liboqs
