@@ -1,5 +1,5 @@
-from app.crypto._oqs_loader import load_key_encapsulation
-from app.services.algorithm_support import enabled_mechanisms
+from crypto._oqs_loader import load_key_encapsulation
+from services.algorithm_support import enabled_mechanisms
 
 class KEMManager:
     @staticmethod

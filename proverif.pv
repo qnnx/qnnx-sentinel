@@ -1,0 +1,40 @@
+(* 1. DECLARATIONS *)
+type key.
+type id.
+type nonce.
+
+free public_channel: channel.
+
+(* Cryptographic functions *)
+fun hash(key, nonce): bitstring.
+
+(* 2. QUERIES *)
+(* We will test if the attacker can guess the securely generated API key *)
+query attacker(new api_secret_key).
+
+event client_started.
+event server_authenticated.
+query event(server_authenticated) ==> event(client_started).
+
+(* 3. SUB-PROCESSES *)
+let Client(client_id: id, k: key) =
+    event client_started;
+    new n: nonce;
+    out(public_channel, (client_id, n)); (* Send ID and Nonce *)
+    out(public_channel, hash(k, n)).     (* Send MAC verification *)
+
+let Server(expected_id: id, k: key) =
+    in(public_channel, (client_id: id, n: nonce));
+    in(public_channel, mac: bitstring);
+    if client_id = expected_id then
+    if mac = hash(k, n) then
+    event server_authenticated.
+
+(* 4. MAIN PROCESS *)
+process
+    (* We generate both the ID and the Secret Key locally in the main execution *)
+    new client_id: id;
+    new api_secret_key: key; 
+    
+    (* Now we pass these locally bound variables into the parallel processes *)
+    (!Client(client_id, api_secret_key) | !Server(client_id, api_secret_key))
